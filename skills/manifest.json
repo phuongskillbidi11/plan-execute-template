@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "name": "example",
+      "description": "Describe what this skill covers in one or two sentences.",
+      "path": "skills/example/SKILL.md"
+    },
+    {
+      "name": "planner-executor-setup",
+      "description": "Bootstrap the Planner-Executor workflow into any new project so that Claude acts as Planner and GitHub Copilot acts as Executor, with Karpathy principles enforced throughout.",
+      "path": "skills/planner-executor-setup/SKILL.md"
+    }
+  ]
+}
