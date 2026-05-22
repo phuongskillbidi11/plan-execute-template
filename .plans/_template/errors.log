@@ -1,0 +1,56 @@
+# Errors Log — [Feature Name]
+
+> **Who writes this:** The Executor (Copilot) when a task is marked `[!]`.
+> **Format:** One entry per failed task. Never delete entries — mark as resolved.
+> **Purpose:** User copies the relevant entry and pastes it into Claude Code
+> using the relay template in `.claude/relay-prompt-template.md`.
+
+---
+
+## Error entries
+
+### Error #1
+**Task:** [Task number and title, e.g. "Task 1.2 — Create QuestionRepository"]
+**File:** [Exact file path being modified/created]
+**Timestamp:** [YYYY-MM-DD HH:MM]
+**Status:** [ ] Unresolved / [ ] Relayed to Planner / [x] Resolved
+
+**What was attempted:**
+[One paragraph describing exactly what the executor tried to do]
+
+**Exact error output:**
+```
+[Paste the complete error message here — do not summarize]
+```
+
+**Last working state:**
+[What was the last thing that worked before this error?
+Which tasks are confirmed `[x]` and safe to keep?]
+
+**Attempted fixes (if any):**
+- [Fix attempt 1] → result: [still failed / different error]
+- [Fix attempt 2] → result: [still failed / different error]
+
+**Resolution:**
+[Leave blank until resolved. Fill in what fixed it.]
+
+---
+
+### Error #2
+**Task:**
+**File:**
+**Timestamp:**
+**Status:** [ ] Unresolved / [ ] Relayed to Planner / [x] Resolved
+
+**What was attempted:**
+
+**Exact error output:**
+```
+
+```
+
+**Last working state:**
+
+**Attempted fixes:**
+
+**Resolution:**

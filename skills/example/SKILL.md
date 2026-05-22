@@ -2,6 +2,7 @@
 
 > This is a template skill. Copy this folder, rename it, and fill in the
 > sections below. Then run `./scripts/update-manifest.sh` to register it.
+> Add frontmatter metadata below the `# Skill:` line once you fill it in.
 
 ---
 
@@ -25,9 +26,6 @@ planning:
 
 ## Files involved
 
-List the key files this skill relates to. This helps Claude know where to look
-and helps Copilot know which files a plan is likely to touch.
-
 | File | Role |
 |---|---|
 | `path/to/file.ext` | What it does |
@@ -37,8 +35,6 @@ and helps Copilot know which files a plan is likely to touch.
 
 ## Constraints and gotchas
 
-List anything a planner must know to avoid common mistakes:
-
 - [e.g., "Always source the environment before building: `. ~/env/activate`"]
 - [e.g., "This module is shared — changes here affect both services A and B"]
 - [e.g., "The config file is generated at build time — do not edit it directly"]
@@ -47,10 +43,9 @@ List anything a planner must know to avoid common mistakes:
 
 ## Patterns
 
-Show the code patterns, idioms, or conventions used in this area. Copilot will
-follow these when implementing tasks derived from this skill.
+Show the code patterns, idioms, or conventions used in this area:
 
-```[language]
+```
 // Example pattern — rename to the actual language
 function doThing(param) {
     // show the expected style, not pseudocode
@@ -61,9 +56,6 @@ function doThing(param) {
 
 ## Step-by-step (common task)
 
-If there is a well-known multi-step process for this area, document it here.
-Claude will use this to write tasks.md more accurately.
-
 1. [Step 1 — what to do and in which file]
 2. [Step 2]
 3. [Step 3 — including any verification step]
@@ -72,12 +64,10 @@ Claude will use this to write tasks.md more accurately.
 
 ## Tests and verification
 
-How to verify this area is working correctly:
-
 ```bash
 # Replace with the actual command
 [TEST_COMMAND]
 ```
 
-**Pass:** [what success looks like]  
+**Pass:** [what success looks like]
 **Fail:** [what to report and to whom]

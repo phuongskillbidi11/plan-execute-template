@@ -83,6 +83,22 @@ _detect() {
         RUN="go run ."
         LINT="$(command -v golangci-lint &>/dev/null && echo 'golangci-lint run' || echo '')"
 
+    # C# — solution file (check before generic CMake)
+    elif ls *.sln 1>/dev/null 2>&1; then
+        TYPE="csharp"
+        BUILD="dotnet build $(ls *.sln | head -1)"
+        TEST="dotnet test"
+        LINT="dotnet format $(ls *.sln | head -1) --verify-no-changes"
+        RUN="dotnet run --project $(ls -d */ | grep -iE 'UI|App|Client' | head -1 || echo 'src/')"
+
+    # C# — single project file (no solution)
+    elif ls *.csproj 1>/dev/null 2>&1; then
+        TYPE="csharp"
+        BUILD="dotnet build"
+        TEST="dotnet test"
+        LINT="dotnet format --verify-no-changes"
+        RUN="dotnet run"
+
     # Generic CMake (non-ESP-IDF)
     elif has "CMakeLists.txt"; then
         TYPE="c-cpp"

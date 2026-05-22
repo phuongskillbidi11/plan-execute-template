@@ -2,8 +2,13 @@
   "version": 1,
   "skills": [
     {
+      "name": "karpathy-guidelines",
+      "description": "Core behavioral rules preventing the most common LLM coding mistakes. Load alongside any domain skill — applies universally.",
+      "path": "skills/karpathy-guidelines/SKILL.md"
+    },
+    {
       "name": "example",
-      "description": "Describe what this skill covers in one or two sentences.",
+      "description": "Blank skill template — copy this folder to add a new project-specific skill.",
       "path": "skills/example/SKILL.md"
     },
     {

@@ -175,3 +175,31 @@ Claude should be aware of. Example:]
 - [e.g., "Always run `npm install` after pulling if package.json changed"]
 - [e.g., "The staging environment uses a different config file — see .env.staging"]
 - [e.g., "Tests require a running Docker container — see docker-compose.yml"]
+
+---
+
+## Current state
+
+> **Maintainer note:** Update this section at the end of every sprint.
+> This is the single source of truth for "what exists right now."
+> Claude Code must read this section before writing any plan.
+
+**Last updated:** [DATE]
+**Completed sprints:** None yet
+
+### What exists
+- [ ] [list components as they get built]
+
+### Known issues / tech debt
+_None yet_
+
+### Decisions made (summary)
+_See `.plans/*/DECISION_LOG.md` for full reasoning_
+
+| Decision | Chosen | Rejected | Sprint |
+|----------|--------|----------|--------|
+| _None yet_ | | | |
+
+### What NOT to regenerate
+_Populate after first sprint completes. Files listed here must not be overwritten
+by future plans — they are considered stable and correct._

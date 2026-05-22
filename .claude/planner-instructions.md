@@ -246,3 +246,22 @@ Run each test after completing the corresponding task. Stop on first failure.
 
 Leave completed `.plans/` folders in place — they are a permanent record of
 design decisions. Do not delete or archive them.
+
+---
+
+## Task status protocol (added in upgrade)
+
+When writing `tasks.md`, always use these four status markers:
+- `[ ]` not started
+- `[~]` in progress
+- `[x]` complete — only after verification command passes
+- `[!]` failed — executor must stop and report
+
+Every task block MUST include:
+1. `**File:**` — exact relative path
+2. `**Symbol:**` — class or method being created/modified
+3. `**Action:**` — one paragraph, imperative mood
+4. `**Verification:**` — exact shell command
+5. `**Pass:**` and `**Fail:**` — unambiguous conditions
+6. `**Status:**` — one of the four markers above
+7. `**Error (if [!]):**` — blank until failure occurs
