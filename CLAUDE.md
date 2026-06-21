@@ -186,6 +186,7 @@ Claude should be aware of. Example:]
 
 **Last updated:** [DATE]
 **Completed sprints:** None yet
+**Executors supported:** GitHub Copilot (`.github/copilot-instructions.md`), OpenAI Codex (`AGENTS.md`), Claude Code (executor mode via direct prompt)
 
 ### What exists
 - [ ] [list components as they get built]

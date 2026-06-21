@@ -1,5 +1,9 @@
 # Relay Prompt Template
 
+> **Multi-executor note:** This template works for any executor
+> (Copilot, Codex, Claude Code in executor mode). Replace "Copilot"
+> in the prompt with the actual executor name being used.
+
 > **When to use:** Copy this template when a task is marked `[!]` in tasks.md.
 > Fill in the blanks and paste the completed prompt into Claude Code.
 > Claude Code will revise ONLY the failing task — no other tasks will change.
