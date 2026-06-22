@@ -1,22 +1,31 @@
 # ai-planner-executor
 
-> **Claude plans. Copilot codes. You relay.**  
+> **Claude plans. Any AI codes. You relay.**  
 > A structured AI development workflow that separates thinking from implementation.
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 ![Works with Claude Code](https://img.shields.io/badge/Claude-Code-orange)
 ![Works with GitHub Copilot](https://img.shields.io/badge/GitHub-Copilot-green)
+![Works with OpenAI Codex](https://img.shields.io/badge/OpenAI-Codex-412991)
 ![Language agnostic](https://img.shields.io/badge/Language-Agnostic-lightgrey)
 
 ---
 
 ## Overview
 
-Most AI-assisted development fails not because the AI can't code, but because it starts coding before the problem is understood. This template enforces a clean separation: **Claude thinks, Copilot implements.**
+Most AI-assisted development fails not because the AI can't code, but because it starts coding before the problem is understood. This template enforces a clean separation: **Claude thinks, the Executor implements.**
 
 **Claude (Planner)** reads the codebase, asks clarifying questions, and produces a three-file plan: `spec.md` (what and why), `tasks.md` (exact ordered checklist with file paths and line numbers), and `tests.md` (unambiguous pass/fail criteria). Claude never touches source code.
 
-**GitHub Copilot (Executor)** reads the plan, implements one task at a time, runs the specified test after each task, marks it complete, and stops the moment a test fails — reporting the exact error back to you. You relay that error to Claude, Claude revises only the failing task, and the loop continues.
+**The Executor** reads the plan, implements one task at a time, runs the specified test after each task, marks it complete, and stops the moment a test fails — reporting the exact error back to you. You relay that error to Claude, Claude revises only the failing task, and the loop continues.
+
+**Supported executors — pick any one:**
+
+| Executor | How it receives instructions |
+|---|---|
+| GitHub Copilot (VS Code Agent mode) | `.github/copilot-instructions.md` |
+| OpenAI Codex CLI | `AGENTS.md` (repo root) |
+| Claude Code (executor mode) | Direct prompt — paste plan contents |
 
 This workflow is built on **Andrej Karpathy's engineering principles**: think before coding, prefer simplicity, make surgical changes, and define done by user-visible outcomes — not by whether the build passes.
 
@@ -27,7 +36,8 @@ This workflow is built on **Andrej Karpathy's engineering principles**: think be
 | Tool | Required | Notes |
 |---|---|---|
 | [Claude Code](https://claude.ai/code) | Yes | CLI or desktop app; free tier works |
-| [GitHub Copilot](https://github.com/features/copilot) | Yes | Requires subscription; VS Code extension + Agent mode |
+| [GitHub Copilot](https://github.com/features/copilot) | One of these | Requires subscription; VS Code extension + Agent mode |
+| [OpenAI Codex CLI](https://github.com/openai/codex) | One of these | `npm install -g @openai/codex`; reads `AGENTS.md` automatically |
 | Python 3 | Recommended | Used by helper scripts for JSON parsing; falls back to grep |
 | Bash 4+ | Yes | All scripts are bash; macOS users: `brew install bash` |
 | ESP-IDF (≥ v5.5) | ESP-IDF projects only | Other project types auto-detected |
@@ -81,7 +91,7 @@ bash /tmp/pe-template/scripts/init.sh
 
 The script does four things automatically:
 
-1. **Detects your project type** (ESP-IDF, Rust, Node.js, Python, Go, C++, Make)
+1. **Detects your project type** (ESP-IDF, Rust, Node.js, Python, Go, C++, C#/.NET, Make)
 2. **Copies template files** — skips any that already exist (safe to re-run)
 3. **Writes `.planner-executor/config.yaml`** with detected build/test commands
 4. **Fills placeholders** in `CLAUDE.md` with your project name and detected commands
@@ -99,6 +109,7 @@ Target: /home/user/projects/my-project
 → Copying template files (skip if already present)...
   [OK]  Created CLAUDE.md
   [OK]  Created .github/copilot-instructions.md
+  [OK]  Created AGENTS.md
 
 → Detecting project type...
    Detected: nodejs
@@ -115,15 +126,18 @@ Done. Next steps:
 
 ### Step 3 — Fill in `CLAUDE.md`
 
-Open `CLAUDE.md` and complete the sections that the script could not auto-fill:
+Open `CLAUDE.md` and complete the sections the script could not auto-fill:
 
 - **Architecture** — describe your folder structure and data flow
 - **Key files** — list the 5–10 most important files with their roles
 - **Coding conventions** — async/await preference, naming rules, etc.
+- **Current state** — update after each sprint; Claude reads this before planning
 
 This is the most important step. The more context you give Claude here, the more accurate its plans will be.
 
-### Step 4 — Enable Copilot instruction files in VS Code
+### Step 4 — Enable your executor
+
+**Using GitHub Copilot:**
 
 Add this to `.vscode/settings.json` (create the file if it doesn't exist):
 
@@ -134,6 +148,15 @@ Add this to `.vscode/settings.json` (create the file if it doesn't exist):
 ```
 
 > **WSL users:** Always open VS Code from the WSL terminal (`code .`), not from Windows Explorer. This prevents UNC path errors that stop Copilot from reading workspace files.
+
+**Using OpenAI Codex CLI:**
+
+No extra configuration needed — Codex reads `AGENTS.md` from the repo root automatically on every session.
+
+```bash
+# Verify Codex sees the instructions
+codex "What is your role in this project?"
+```
 
 ### Step 5 — Verify the setup
 
@@ -147,11 +170,18 @@ Expected: Claude describes itself as the Planner and explains it will never writ
 
 **Verify Copilot knows its role:**
 
-Open VS Code Copilot Chat and type:
+Open VS Code Copilot Chat → Agent mode → type:
 ```
 What are my project instructions?
 ```
 Expected: Copilot describes the Executor role — read the plan, implement tasks in order, stop on failure.
+
+**Verify Codex knows its role:**
+
+```bash
+codex "What are your instructions for this repo?"
+```
+Expected: Codex describes the role-switching table from `AGENTS.md` and the task loop.
 
 **Run the smoke tests:**
 
@@ -206,9 +236,9 @@ Claude will:
 - Then write `tasks.md` with exact file + line references
 - Then write `tests.md` with pass/fail conditions
 
-### 2 — Ask Copilot to implement the plan
+### 2 — Ask the Executor to implement the plan
 
-Switch to VS Code → open Copilot Chat → select **Agent** mode in the dropdown:
+**GitHub Copilot (VS Code → Copilot Chat → Agent mode):**
 
 ```
 Read the plan in .plans/2025-05-01-jwt-auth/
@@ -219,36 +249,58 @@ Mark [x] in tasks.md when the test passes.
 Stop and report the exact error if a test fails.
 ```
 
-Copilot will work through every `[ ]` checkbox, running the verification command after each one and marking it `[x]` before moving on.
+**OpenAI Codex CLI:**
+
+```bash
+codex "Implement the plan in .plans/2025-05-01-jwt-auth/ — read spec.md, tasks.md, tests.md in that order, implement one task at a time, run each test, mark [x] on pass, stop and report on failure."
+```
+
+**Claude Code (executor mode):**
+
+```
+You are the Executor. Read .plans/2025-05-01-jwt-auth/spec.md,
+tasks.md, and tests.md. Implement each task in order. Do not plan —
+only implement what tasks.md says. Stop on the first failing test.
+```
+
+The Executor works through every `[ ]` checkbox, runs the verification command after each one, and marks it `[x]` before moving on.
+
+### Task status markers
+
+All executors use the same four markers in `tasks.md`:
+
+| Marker | Meaning |
+|---|---|
+| `[ ]` | Not started |
+| `[~]` | In progress (executor is currently working on this task) |
+| `[x]` | Complete — verification command passed |
+| `[!]` | Failed — executor stopped; relay the error to Claude |
 
 ### 3 — Relay failures back to Claude
 
-If Copilot stops on a failing test:
+When a test fails, the executor marks the task `[!]` and writes to `.plans/[folder]/errors.log`. Use the relay template:
 
-```
-Claude, Copilot failed on Task 2.1 of .plans/2025-05-01-jwt-auth/
-
-Error:
-  TypeError: Cannot read properties of undefined (reading 'userId')
-  at authMiddleware (src/middleware/auth.js:14:22)
-
-Context: Copilot added the middleware but the request object doesn't
-have the decoded token attached yet.
-
-Please update tasks.md with a corrected approach for Task 2.1 only.
+```bash
+cat .claude/relay-prompt-template.md
 ```
 
-Claude revises only that task. Hand the updated `tasks.md` back to Copilot:
+Fill in the template and paste it into Claude Code. Claude revises only the failing task. Hand the updated `tasks.md` back to the executor:
 
+**Copilot:**
 ```
 Resume from Task 2.1 with the updated tasks.md.
+```
+
+**Codex:**
+```bash
+codex "Resume implementing .plans/2025-05-01-jwt-auth/ from task 2.1 — tasks.md has been updated."
 ```
 
 ### 4 — Repeat until done
 
 The loop is: Plan → Implement → Test → (fail → Revise → Resume) → Done.
 
-When all checkboxes in `tasks.md` are `[x]`, Copilot reports:
+When all checkboxes in `tasks.md` are `[x]`, the executor reports:
 
 ```
 PLAN COMPLETE: jwt-auth
@@ -256,6 +308,20 @@ Tasks completed: 8
 Files changed: src/middleware/auth.js, src/routes/api.js, tests/auth.test.js
 All tests passed. Ready for review.
 ```
+
+---
+
+## Failure relay workflow
+
+When a task is marked `[!]`, follow this structured relay:
+
+1. **Find the error** — executor writes full output to `.plans/[folder]/errors.log`
+2. **Open the relay template** — `cat .claude/relay-prompt-template.md`
+3. **Fill in the blanks** — plan folder, failed task, exact error, what was attempted
+4. **Paste into Claude Code** — Claude rewrites only the failing task
+5. **Resume the executor** — give it the updated `tasks.md`
+
+The relay template is executor-agnostic — it works for Copilot, Codex, and Claude Code executor mode. Replace "Copilot" in the template with whichever executor you're using.
 
 ---
 
@@ -268,6 +334,8 @@ skills/
   manifest.json            ← auto-generated index
   example/
     SKILL.md               ← blank template
+  karpathy-guidelines/
+    SKILL.md               ← universal: Karpathy principles applied to planning
   planner-executor-setup/
     SKILL.md               ← documents this workflow itself
   [your-skill]/
@@ -277,6 +345,8 @@ skills/
 **How it works:** Before writing a plan, Claude reads `skills/manifest.json`. If your request matches a skill (e.g., you mention "web UI" and there's a `web-ui` skill), Claude loads only that skill. This keeps prompts small and plans accurate.
 
 **Progressive disclosure advantage:** Instead of pasting 500 lines of context into every conversation, you write it once in a skill and Claude fetches it on demand.
+
+**Skill metadata:** Each `SKILL.md` includes a header with `last_updated`, `confidence`, and `status` so Claude knows how fresh the knowledge is.
 
 ### Adding a custom skill
 
@@ -319,6 +389,27 @@ cp -r skills/example/ skills/api/
 
 ---
 
+## Plan quality and self-evaluation
+
+Every plan Claude writes is scored against a 10-point rubric before being handed to the Executor. The rubric lives in `.plans/_template/spec.md` and checks for:
+
+- Clear goal statement (1 sentence, user-visible outcome)
+- "Out of scope" section with at least 3 explicit exclusions
+- All tasks name exact file + symbol + line range
+- Every task group has a corresponding test
+- No premature abstractions (helpers with only one caller)
+- `tests.md` has binary pass/fail for every test (no judgment calls)
+
+**Planning principles** (from `.claude/principles/`):
+
+| File | Content |
+|---|---|
+| `karpathy.md` | Four core principles with applied checklists |
+| `plan-quality.md` | 10-point self-evaluation rubric |
+| `thinking-checklist.md` | Pre-planning checklist Claude runs before writing `spec.md` |
+
+---
+
 ## Helper scripts reference
 
 ```bash
@@ -331,7 +422,7 @@ cp -r skills/example/ skills/api/
 # Show task checkboxes for a specific plan
 ./scripts/plan-executor.sh status .plans/2025-05-01-jwt-auth
 
-# Print all three plan files to stdout (paste into Copilot)
+# Print all three plan files to stdout (paste into any executor)
 ./scripts/plan-executor.sh open .plans/2025-05-01-jwt-auth
 
 # Run build + test commands from config.yaml
@@ -358,6 +449,7 @@ bash scripts/init.sh --upgrade
 | Python | `pyproject.toml`, `requirements.txt` | `pytest -x` |
 | Go | `go.mod` | `go test ./...` |
 | C/C++ (CMake) | `CMakeLists.txt` | `ctest --test-dir build` |
+| C# / .NET | `*.csproj`, `*.sln` | `dotnet test` |
 | Generic | `Makefile` | `make test` |
 
 ### Manual override
@@ -378,6 +470,8 @@ env_setup: "export CC=clang && export CXX=clang++"
 
 **Docker-based tests:** Set `test_cmd: "docker compose run --rm test"`.
 
+**C# / .NET:** Detection looks for `.csproj` or `.sln`. Default test command is `dotnet test`. Set `build_cmd: "dotnet build"`.
+
 ---
 
 ## Troubleshooting
@@ -391,6 +485,18 @@ env_setup: "export CC=clang && export CXX=clang++"
 cd ~/projects/my-project && code .
 ```
 The bottom-left status bar should show `WSL: Ubuntu-22.04` in green.
+
+---
+
+### Codex does not see AGENTS.md instructions
+
+**Symptom:** Codex behaves generically and doesn't mention the Executor role or task markers.
+
+**Fix:** Confirm `AGENTS.md` is at the repo root (not in a subdirectory) and that Codex is run from within the repo:
+```bash
+ls AGENTS.md           # must exist at root
+codex "What is your role in this project?"
+```
 
 ---
 
@@ -428,11 +534,11 @@ ls skills/
 
 ---
 
-### Copilot marks tasks `[x]` without running tests
+### Executor marks tasks `[x]` without running tests
 
 **Symptom:** Tasks are marked complete but tests were not actually run.
 
-**Fix:** Add this line to your Copilot prompt:
+**Fix:** Add this line to your executor prompt:
 ```
 Do NOT mark any task [x] until you have run the exact test command
 from tests.md and confirmed it passes. Show me the command output.
@@ -455,14 +561,20 @@ Then edit `.planner-executor/config.yaml` to correct any wrong values.
 ```
 ai-planner-executor/
 ├── CLAUDE.md                              ← edit this for your project
+├── AGENTS.md                              ← OpenAI Codex CLI instructions
 ├── ROADMAP.md                             ← planned improvements
 ├── README.md                              ← this file
 │
 ├── .claude/
-│   └── planner-instructions.md           ← Claude's full role definition
+│   ├── planner-instructions.md           ← Claude's full Planner role definition
+│   ├── relay-prompt-template.md          ← structured template for relaying failures
+│   └── principles/
+│       ├── karpathy.md                   ← 4 Karpathy principles with checklists
+│       ├── plan-quality.md               ← 10-point plan self-evaluation rubric
+│       └── thinking-checklist.md         ← pre-planning checklist
 │
 ├── .github/
-│   └── copilot-instructions.md           ← Copilot's full role definition
+│   └── copilot-instructions.md           ← GitHub Copilot Executor role definition
 │
 ├── .planner-executor/
 │   └── config.yaml.template              ← copy → config.yaml, fill in values
@@ -478,10 +590,19 @@ ai-planner-executor/
 │   ├── manifest.json                     ← auto-generated; do not edit by hand
 │   ├── example/
 │   │   └── SKILL.md                      ← blank template for new skills
+│   ├── karpathy-guidelines/
+│   │   └── SKILL.md                      ← universal Karpathy principles skill
 │   └── planner-executor-setup/
 │       └── SKILL.md                      ← documents this workflow itself
 │
 └── .plans/
+    ├── _template/                        ← copy this when starting a new plan
+    │   ├── spec.md                       ← spec template with self-eval rubric
+    │   ├── tasks.md                      ← tasks template with 4-status markers
+    │   ├── tests.md                      ← tests template with pass/fail format
+    │   ├── DECISION_LOG.md               ← record design decisions and rejections
+    │   ├── sprint-summary.md             ← end-of-sprint retrospective template
+    │   └── errors.log                    ← structured failure log for relay workflow
     └── demo-feature/                     ← example plan (dark mode toggle)
         ├── spec.md
         ├── tasks.md
@@ -507,7 +628,7 @@ Contributions follow the same workflow this template enforces:
 **What to avoid:**
 - Refactoring scripts without a clear problem statement
 - Adding dependencies beyond `bash`, `python3`, and standard Unix tools
-- Changing `CLAUDE.md` or `copilot-instructions.md` without a plan
+- Changing `CLAUDE.md` or executor instruction files without a plan
 
 ---
 
@@ -526,4 +647,4 @@ Workflow philosophy based on [Andrej Karpathy's](https://karpathy.ai) engineerin
 principles: think before coding, prefer simplicity, make surgical changes, define
 done by user-visible outcomes.
 
-Built with [Claude Code](https://claude.ai/code) and [GitHub Copilot](https://github.com/features/copilot).
+Built with [Claude Code](https://claude.ai/code), [GitHub Copilot](https://github.com/features/copilot), and [OpenAI Codex](https://github.com/openai/codex).
