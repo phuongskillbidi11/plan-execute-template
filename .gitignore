@@ -1,0 +1,6 @@
+# Go build output
+cli/eng
+cli/eng.exe
+
+# IDE / editor artifacts
+.vs/

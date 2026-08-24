@@ -1,0 +1,12 @@
+.git/
+node_modules/
+dist/
+build/
+vendor/
+third_party/
+target/
+__pycache__/
+.venv/
+*.pyc
+.next/
+out/

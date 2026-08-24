@@ -60,11 +60,25 @@ From: `.plans/YYYY-MM-DD-feature-name/`
 
 ## Modules
 
-<!--
-Delete this comment and everything below it once the project has real modules to document.
-Add one section per module/directory as it's built — via the update-src-map task described
-above, not in a separate cleanup pass.
--->
+### `cli/` — the `eng` CLI
 
-_Nothing documented yet — this file is created empty by `scripts/init.sh` and grows one
-section per feature, via the last task of that feature's own `tasks.md`._
+What it does: Go CLI (`eng install`, `eng init`, `eng doctor`, `eng scan`,
+`eng skills list`) that installs the harness payload globally and links a thin
+`.agent/project.yaml` into any project.
+
+Key files: `cli/main.go` (dispatch), `cli/internal/project/project.go` (mode detection),
+`cli/internal/skills/skills.go` (global+local skill resolution)
+
+From: `.plans/2026-08-24-v2-harness-foundation/`
+
+### `harness/` — the installable harness payload
+
+What it does: source tree copied by `eng install` into `~/.engineering-harness/` — core
+Planner/Executor methodology, the first skill (`engineering/karpathy-guidelines`), the
+`software` profile, and the plan templates.
+
+Notable: skills here use YAML frontmatter for metadata; project-local skills without
+frontmatter still resolve via the legacy `# Skill:` heading convention — see
+`cli/internal/skills/skills.go`.
+
+From: `.plans/2026-08-24-v2-harness-foundation/`

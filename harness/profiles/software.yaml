@@ -1,0 +1,4 @@
+name: software
+description: Default profile for general software engineering projects.
+skills:
+  - engineering/karpathy-guidelines

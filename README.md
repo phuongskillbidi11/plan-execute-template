@@ -658,6 +658,24 @@ ai-planner-executor/
 
 ---
 
+## V2 harness (preview)
+
+This repository is evolving from a clone-per-project template into a globally-installable
+harness. The V1 workflow above (`scripts/init.sh`, per-project `skills/`, `.plans/`) is
+unaffected and continues to work exactly as documented — nothing here requires migrating.
+
+```bash
+cd cli && go build -o eng .
+./eng install --from ..              # populate ~/.engineering-harness/
+cd /path/to/any/project
+/path/to/eng init                    # writes .agent/project.yaml only
+/path/to/eng doctor                  # reports legacy / hybrid / modern + resolved skills
+```
+
+See `.plans/2026-08-24-v2-harness-foundation/spec.md` for the full design.
+
+---
+
 ## Contributing
 
 Contributions follow the same workflow this template enforces:
