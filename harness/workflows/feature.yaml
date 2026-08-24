@@ -1,0 +1,2 @@
+name: feature
+stages: [triage, plan, review, execute, verify]

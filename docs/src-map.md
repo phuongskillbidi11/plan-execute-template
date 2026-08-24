@@ -105,8 +105,30 @@ From: `.plans/2026-08-24-v2-harness-phase2/`
 ### `harness/core/triage/`, `harness/core/plan-reviewer/`, `harness/core/verifier/` — new roles
 
 What it does: methodology docs for the three roles Phase 2 adds around the existing
-Planner/Executor loop. None of them are enforced by code — `review.md` and
-`verify-report.md` are the enforcement surface (a file with a clear verdict), not a gate a
-script can close.
+Planner/Executor loop. As of Phase 2, none of them were enforced by code — `review.md` and
+`verify-report.md` were the enforcement surface (a file with a clear verdict), not a gate a
+script could close. **Phase 3 update:** the Reviewer's and Verifier's verdicts are now also
+persisted as machine-readable fields on `plan.yaml` (`eng plan review`, and `eng verify`
+automatically) and actually gate `eng workflow advance` — see the next entry.
 
 From: `.plans/2026-08-24-v2-harness-phase2/`
+
+### `cli/internal/workflow/`, `cli/internal/agent/`, `cli/internal/capabilities/`, `cli/internal/executil/` — Phase 3 orchestration
+
+What it does: `workflow` holds the lifecycle state enum and the pure transition table
+(`Decide`); `agent` defines the `Adapter` interface with `ClaudeCodeAdapter` as the only
+implementation; `capabilities` detects which known CLI tools are on PATH; `executil` runs a
+command either as a shell string (compatibility mode) or a structured argv (no shell).
+
+Key files: `cli/workflow_cmd.go` (`eng workflow start/status/advance`), `cli/adapter_cmd.go`
+(`eng adapter prompt`), `cli/internal/workflow/workflow.go` (the transition table)
+
+Notable: `eng workflow advance` never writes plan content and never invokes an agent
+unattended — every human/AI-driven stage ends with a printed next command and a stop. The
+approval gate (`requires_approval`/`approved_at` on `plan.yaml`) is enforced here: a plan
+cannot reach `EXECUTING` while it's set and unapproved (verified end-to-end in this plan's
+`tests.md` T11b). A real defect was found and fixed during this plan's own execution: Go's
+`flag` package silently drops flags placed after a positional argument (e.g.
+`eng plan review <dir> --verdict PASS`) — see `docs/gotchas.md`.
+
+From: `.plans/2026-08-24-v2-harness-phase3/`

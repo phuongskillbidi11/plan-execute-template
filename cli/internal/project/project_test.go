@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"gopkg.in/yaml.v3"
+
+	"eng/internal/executil"
 )
 
 func TestDetectModeLegacy(t *testing.T) {
@@ -26,7 +28,7 @@ func TestDetectModeNone(t *testing.T) {
 
 func TestSaveLoadRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	cfg := &Config{ProjectName: "x", Mode: "modern", Stack: Stack{Type: "go"}}
+	cfg := &Config{ProjectName: "x", Mode: "modern", Stack: Stack{Type: "go", Test: executil.Command{Shell: "go test ./..."}}}
 	if err := Save(dir, cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -34,8 +36,23 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Mode != "modern" || got.Stack.Type != "go" {
+	if got.Mode != "modern" || got.Stack.Type != "go" || got.Stack.Test.Shell != "go test ./..." {
 		t.Fatalf("round-trip mismatch: %+v", got)
+	}
+}
+
+func TestPlainStringStackCommandStillParses(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".agent"), 0o755)
+	content := "project_name: x\nmode: modern\nstack:\n  type: go\n  build_cmd: \"go build ./...\"\n"
+	os.WriteFile(filepath.Join(dir, ConfigPath), []byte(content), 0o644)
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Stack.Build.Shell != "go build ./..." {
+		t.Fatalf("expected plain string to parse as Shell, got %+v", cfg.Stack.Build)
 	}
 }
 

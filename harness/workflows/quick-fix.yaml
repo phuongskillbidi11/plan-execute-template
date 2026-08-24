@@ -1,0 +1,2 @@
+name: quick-fix
+stages: [triage, execute, verify]

@@ -5,16 +5,18 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	"eng/internal/executil"
 )
 
 type Config struct {
-	BeforePlan    []string          `yaml:"before_plan"`
-	AfterPlan     []string          `yaml:"after_plan"`
-	BeforeExecute []string          `yaml:"before_execute"`
-	AfterTask     []string          `yaml:"after_task"`
-	AfterExecute  []string          `yaml:"after_execute"`
-	OnFailure     []string          `yaml:"on_failure"`
-	Commands      map[string]string `yaml:"commands"`
+	BeforePlan    []string                    `yaml:"before_plan"`
+	AfterPlan     []string                    `yaml:"after_plan"`
+	BeforeExecute []string                    `yaml:"before_execute"`
+	AfterTask     []string                    `yaml:"after_task"`
+	AfterExecute  []string                    `yaml:"after_execute"`
+	OnFailure     []string                    `yaml:"on_failure"`
+	Commands      map[string]executil.Command `yaml:"commands"`
 }
 
 // Load reads .agent/hooks.yaml if present, else globalDefaultPath. A

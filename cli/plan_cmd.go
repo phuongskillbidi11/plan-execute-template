@@ -5,16 +5,46 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"eng/internal/gitutil"
 	"eng/internal/planmeta"
 	"eng/internal/project"
+	"eng/internal/workflow"
 )
+
+// reorderFlagsFirst moves "--flag"/"--flag=value" tokens (and, for a
+// non-boolean flag, the value token immediately following it) ahead of any
+// positional arguments, so a command reads correctly regardless of whether
+// a user writes "eng plan review <dir> --verdict PASS" or
+// "eng plan review --verdict PASS <dir>". Go's flag package only supports
+// the latter natively — it stops parsing at the first non-flag token, which
+// silently discarded every flag in this family of commands until this fix.
+func reorderFlagsFirst(args []string, boolFlags map[string]bool) []string {
+	var flags, positional []string
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if !strings.HasPrefix(a, "-") {
+			positional = append(positional, a)
+			continue
+		}
+		flags = append(flags, a)
+		name := strings.TrimLeft(a, "-")
+		if strings.Contains(name, "=") || boolFlags[name] {
+			continue // value is embedded, or this flag takes no value
+		}
+		if i+1 < len(args) {
+			i++
+			flags = append(flags, args[i])
+		}
+	}
+	return append(flags, positional...)
+}
 
 func cmdPlan(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: eng plan <new|drift|retry> ...")
+		fmt.Println("Usage: eng plan <new|drift|retry|review|approve|block|cancel> ...")
 		os.Exit(1)
 	}
 	switch args[0] {
@@ -24,8 +54,16 @@ func cmdPlan(args []string) {
 		planDrift(args[1:])
 	case "retry":
 		planRetry(args[1:])
+	case "review":
+		planReview(args[1:])
+	case "approve":
+		planApprove(args[1:])
+	case "block":
+		planBlock(args[1:])
+	case "cancel":
+		planCancel(args[1:])
 	default:
-		fmt.Println("Usage: eng plan <new|drift|retry> ...")
+		fmt.Println("Usage: eng plan <new|drift|retry|review|approve|block|cancel> ...")
 		os.Exit(1)
 	}
 }
@@ -33,10 +71,11 @@ func cmdPlan(args []string) {
 func planNew(args []string) {
 	flagset := flag.NewFlagSet("plan new", flag.ExitOnError)
 	risk := flagset.String("risk", "feature", "quick-fix|bug|feature|architecture|high-risk")
-	flagset.Parse(args)
+	requiresApproval := flagset.Bool("requires-approval", false, "force an approval gate regardless of risk level")
+	flagset.Parse(reorderFlagsFirst(args, map[string]bool{"requires-approval": true}))
 	rest := flagset.Args()
 	if len(rest) == 0 {
-		fmt.Println("Usage: eng plan new <name> [--risk <level>]")
+		fmt.Println("Usage: eng plan new <name> [--risk <level>] [--requires-approval]")
 		os.Exit(1)
 	}
 	name := rest[0]
@@ -81,54 +120,45 @@ func planNew(args []string) {
 		budget = planmeta.RetryBudget{Build: eb.Build, UnitTest: eb.UnitTest, IntegrationTest: eb.IntegrationTest}
 	}
 
+	needsApproval := *requiresApproval || *risk == "high-risk"
+
 	meta := &planmeta.Meta{
-		Plan:        filepath.Base(planDir),
-		RiskLevel:   *risk,
-		PlannedAt:   planmeta.PlannedAt{GitSHA: sha},
-		Status:      "planned",
-		RetryBudget: budget,
+		Plan:             filepath.Base(planDir),
+		RiskLevel:        *risk,
+		PlannedAt:        planmeta.PlannedAt{GitSHA: sha},
+		State:            workflow.StateTriaged,
+		RetryBudget:      budget,
+		RequiresApproval: needsApproval,
 	}
 	if err := planmeta.Save(planDir, meta); err != nil {
 		fmt.Println("error:", err)
 		os.Exit(1)
 	}
+	planmeta.AppendEvent(planDir, "triaged", *risk)
 
-	fmt.Printf("Scaffolded %s — risk: %s, git_sha: %s\n", planDir, *risk, sha)
+	fmt.Printf("Scaffolded %s — risk: %s, git_sha: %s, requires_approval: %v\n", planDir, *risk, sha, needsApproval)
 }
 
-// copyTree is defined in install.go and reused here — see plan_cmd.go's own
-// history in tasks.md Task 6.2 for why this comment exists instead of a
-// second definition.
+// copyTree is defined in install.go and reused here.
 
-func planDrift(args []string) {
-	dir := "."
-	if len(args) > 0 {
-		dir = args[0]
-	}
-	planDir, _ := filepath.Abs(dir)
-
+// checkDrift is the pure logic behind `eng plan drift`, factored out so
+// `eng workflow advance` can consult it without re-printing anything.
+func checkDrift(planDir string) (bool, []string, error) {
 	meta, err := planmeta.Load(planDir)
 	if err != nil {
-		fmt.Printf("no %s found in %s — nothing to check\n", planmeta.FileName, planDir)
-		os.Exit(1)
+		return false, nil, fmt.Errorf("no %s found in %s", planmeta.FileName, planDir)
 	}
-
 	repoRoot, err := os.Getwd()
 	if err != nil {
-		fmt.Println("error:", err)
-		os.Exit(1)
+		return false, nil, err
 	}
-
 	changed, err := gitutil.ChangedFilesSince(repoRoot, meta.PlannedAt.GitSHA)
 	if err != nil {
-		fmt.Println("error:", err)
-		os.Exit(1)
+		return false, nil, err
 	}
 	if len(changed) == 0 {
-		fmt.Println("OK — no changes since plan was created")
-		return
+		return false, nil, nil
 	}
-
 	relevant := changed
 	if len(meta.WriteScope) > 0 {
 		relevant = nil
@@ -138,13 +168,28 @@ func planDrift(args []string) {
 			}
 		}
 	}
-	if len(relevant) == 0 {
-		fmt.Println("OK — unrelated files changed, no drift in this plan's scope")
+	return len(relevant) > 0, relevant, nil
+}
+
+func planDrift(args []string) {
+	dir := "."
+	if len(args) > 0 {
+		dir = args[0]
+	}
+	planDir, _ := filepath.Abs(dir)
+
+	drifted, files, err := checkDrift(planDir)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	if !drifted {
+		fmt.Println("OK — no changes since plan was created")
 		return
 	}
 
 	fmt.Println("PLAN_DRIFT_DETECTED — the following files changed since this plan was created:")
-	for _, f := range relevant {
+	for _, f := range files {
 		fmt.Printf("  - %s\n", f)
 	}
 	fmt.Println("\nRevalidate the plan against current source before executing further.")
@@ -183,12 +228,115 @@ func planRetry(args []string) {
 		fmt.Println("error:", err)
 		os.Exit(1)
 	}
+	planmeta.AppendEvent(planDir, "retry", stage)
 
 	if *count > *limit {
 		fmt.Printf("RETRY BUDGET EXHAUSTED for %s (%d/%d) — escalate to Planner or human\n", stage, *count, *limit)
 		os.Exit(1)
 	}
 	fmt.Printf("RETRY %d/%d for %s — proceed\n", *count, *limit, stage)
+}
+
+func planReview(args []string) {
+	flagset := flag.NewFlagSet("plan review", flag.ExitOnError)
+	verdict := flagset.String("verdict", "", "PASS|REJECT")
+	blocking := flagset.Int("blocking-issues", 0, "number of blocking issues found")
+	flagset.Parse(reorderFlagsFirst(args, map[string]bool{}))
+	rest := flagset.Args()
+	if len(rest) == 0 || (*verdict != "PASS" && *verdict != "REJECT") {
+		fmt.Println("Usage: eng plan review <plan-dir> --verdict PASS|REJECT [--blocking-issues N]")
+		os.Exit(1)
+	}
+	planDir, _ := filepath.Abs(rest[0])
+
+	meta, err := planmeta.Load(planDir)
+	if err != nil {
+		fmt.Printf("no %s found in %s\n", planmeta.FileName, planDir)
+		os.Exit(1)
+	}
+
+	meta.Review = planmeta.Review{
+		Verdict:        *verdict,
+		BlockingIssues: *blocking,
+		ReviewedAt:     time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := planmeta.Save(planDir, meta); err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
+	}
+	planmeta.AppendEvent(planDir, "reviewed", *verdict)
+	fmt.Printf("Recorded review verdict: %s (%d blocking issues)\n", *verdict, *blocking)
+}
+
+func planApprove(args []string) {
+	flagset := flag.NewFlagSet("plan approve", flag.ExitOnError)
+	by := flagset.String("by", "", "who is approving")
+	flagset.Parse(reorderFlagsFirst(args, map[string]bool{}))
+	rest := flagset.Args()
+	if len(rest) == 0 {
+		fmt.Println("Usage: eng plan approve <plan-dir> [--by <name>]")
+		os.Exit(1)
+	}
+	planDir, _ := filepath.Abs(rest[0])
+
+	meta, err := planmeta.Load(planDir)
+	if err != nil {
+		fmt.Printf("no %s found in %s\n", planmeta.FileName, planDir)
+		os.Exit(1)
+	}
+
+	meta.ApprovedAt = time.Now().UTC().Format(time.RFC3339)
+	meta.ApprovedBy = *by
+	if err := planmeta.Save(planDir, meta); err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
+	}
+	planmeta.AppendEvent(planDir, "approved", *by)
+	fmt.Printf("Approved by %q at %s\n", *by, meta.ApprovedAt)
+}
+
+func planBlock(args []string) {
+	flagset := flag.NewFlagSet("plan block", flag.ExitOnError)
+	reason := flagset.String("reason", "", "why this plan is blocked")
+	flagset.Parse(reorderFlagsFirst(args, map[string]bool{}))
+	rest := flagset.Args()
+	if len(rest) == 0 {
+		fmt.Println(`Usage: eng plan block <plan-dir> --reason "..."`)
+		os.Exit(1)
+	}
+	setTerminalState(rest[0], workflow.StateBlocked, "blocked", *reason)
+}
+
+func planCancel(args []string) {
+	flagset := flag.NewFlagSet("plan cancel", flag.ExitOnError)
+	reason := flagset.String("reason", "", "why this plan is cancelled")
+	flagset.Parse(reorderFlagsFirst(args, map[string]bool{}))
+	rest := flagset.Args()
+	if len(rest) == 0 {
+		fmt.Println(`Usage: eng plan cancel <plan-dir> [--reason "..."]`)
+		os.Exit(1)
+	}
+	setTerminalState(rest[0], workflow.StateCancelled, "cancelled", *reason)
+}
+
+func setTerminalState(dir, state, eventType, reason string) {
+	planDir, _ := filepath.Abs(dir)
+	meta, err := planmeta.Load(planDir)
+	if err != nil {
+		fmt.Printf("no %s found in %s\n", planmeta.FileName, planDir)
+		os.Exit(1)
+	}
+	meta.State = state
+	if err := planmeta.Save(planDir, meta); err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
+	}
+	planmeta.AppendEvent(planDir, eventType, reason)
+	suffix := ""
+	if reason != "" {
+		suffix = fmt.Sprintf(" (%s)", reason)
+	}
+	fmt.Printf("State set to %s%s\n", state, suffix)
 }
 
 // matchesAnyGlob supports filepath.Match patterns plus a "prefix/**" suffix

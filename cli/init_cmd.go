@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"eng/internal/detect"
+	"eng/internal/executil"
 	"eng/internal/project"
 )
 
@@ -40,10 +41,10 @@ func cmdInit(args []string) {
 		HarnessProfile: "software",
 		Stack: project.Stack{
 			Type:  det.Type,
-			Build: det.Build,
-			Test:  det.Test,
-			Run:   det.Run,
-			Lint:  det.Lint,
+			Build: executil.Command{Shell: det.Build},
+			Test:  executil.Command{Shell: det.Test},
+			Run:   executil.Command{Shell: det.Run},
+			Lint:  executil.Command{Shell: det.Lint},
 		},
 		EnabledSkills: []string{"engineering/karpathy-guidelines"},
 	}

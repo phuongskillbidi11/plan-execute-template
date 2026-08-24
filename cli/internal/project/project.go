@@ -6,14 +6,16 @@ import (
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
+
+	"eng/internal/executil"
 )
 
 type Stack struct {
-	Type  string `yaml:"type"`
-	Build string `yaml:"build_cmd"`
-	Test  string `yaml:"test_cmd"`
-	Run   string `yaml:"run_cmd"`
-	Lint  string `yaml:"lint_cmd"`
+	Type  string           `yaml:"type"`
+	Build executil.Command `yaml:"build_cmd"`
+	Test  executil.Command `yaml:"test_cmd"`
+	Run   executil.Command `yaml:"run_cmd"`
+	Lint  executil.Command `yaml:"lint_cmd"`
 }
 
 type Workflow struct {

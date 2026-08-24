@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"eng/internal/capabilities"
 	"eng/internal/project"
 	"eng/internal/skills"
 )
@@ -50,5 +51,14 @@ func cmdDoctor(args []string) {
 		for _, s := range resolved {
 			fmt.Printf("  - %-30s [%s] %s\n", s.Name, s.Source, s.Description)
 		}
+	}
+
+	fmt.Println("\nCapabilities:")
+	for _, name := range capabilities.Known {
+		status := "unavailable"
+		if capabilities.Detect(name) {
+			status = "available"
+		}
+		fmt.Printf("  %-10s %s\n", name, status)
 	}
 }

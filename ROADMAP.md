@@ -2,9 +2,10 @@
 
 > **2026-08-24:** Phases below describe V1 template evolution. The global-install /
 > multi-project direction they were pointing at is now superseded by
-> `.plans/2026-08-24-v2-harness-foundation/` (global install foundation) and
-> `.plans/2026-08-24-v2-harness-phase2/` (Triage/Plan Reviewer/Verifier/hooks/drift/retry) —
-> see those plans for the current architecture.
+> `.plans/2026-08-24-v2-harness-foundation/` (global install foundation),
+> `.plans/2026-08-24-v2-harness-phase2/` (Triage/Plan Reviewer/Verifier/hooks/drift/retry),
+> and `.plans/2026-08-24-v2-harness-phase3/` (orchestrator, lifecycle state machine, Claude
+> Code adapter) — see those plans for the current architecture.
 
 Phases are ordered by value-to-complexity ratio. Each phase is independent —
 you can skip ahead or implement phases in a different order. Every enhancement

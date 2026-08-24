@@ -687,6 +687,22 @@ cd cli && go build -o eng .
 
 See `.plans/2026-08-24-v2-harness-phase2/spec.md` for the full design.
 
+Phase 3 adds a lightweight orchestrator on top of Phases 1–2's primitives:
+
+```bash
+cd cli && go build -o eng .
+./eng workflow start "add a recommendations endpoint"   # triage + eng plan new + status
+./eng workflow status .plans/2026-08-24-add-a-recommendations-endpoint
+./eng workflow advance .plans/2026-08-24-add-a-recommendations-endpoint
+./eng plan review .plans/2026-08-24-add-a-recommendations-endpoint --verdict PASS
+./eng plan approve .plans/2026-08-24-add-a-recommendations-endpoint   # only if required
+./eng adapter prompt executor .plans/2026-08-24-add-a-recommendations-endpoint
+./eng capabilities list
+./eng start
+```
+
+See `.plans/2026-08-24-v2-harness-phase3/spec.md` for the full design.
+
 ---
 
 ## Contributing

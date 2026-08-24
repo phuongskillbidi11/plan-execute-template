@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"eng/internal/executil"
 	"eng/internal/hooks"
 	"eng/internal/project"
 )
@@ -39,21 +39,22 @@ func cmdHooks(args []string) {
 
 	testCmd := ""
 	if pcfg, err := project.Load(dir); err == nil {
-		testCmd = pcfg.Stack.Test
+		testCmd = pcfg.Stack.Test.String()
 	}
 
 	for _, name := range names {
-		cmdStr := strings.ReplaceAll(cfg.Commands[name], "${test_cmd}", testCmd)
-		if cmdStr == "" {
+		cmd := cfg.Commands[name]
+		if cmd.Empty() {
 			fmt.Printf("[%s] %-16s manual step — no shell command; perform via the documented role\n", stage, name)
 			continue
 		}
-		fmt.Printf("[%s] %-16s -> %s\n", stage, name, cmdStr)
-		c := exec.Command("sh", "-c", cmdStr)
-		c.Dir = dir
-		c.Stdout = os.Stdout
-		c.Stderr = os.Stderr
-		if err := c.Run(); err != nil {
+		if cmd.Shell != "" {
+			cmd.Shell = strings.ReplaceAll(cmd.Shell, "${test_cmd}", testCmd)
+		}
+		fmt.Printf("[%s] %-16s -> %s\n", stage, name, cmd.String())
+		out, err := executil.Run(cmd, dir)
+		fmt.Print(out)
+		if err != nil {
 			fmt.Printf("HOOK FAILED: %s (%v)\n", name, err)
 			os.Exit(1)
 		}

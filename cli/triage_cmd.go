@@ -21,26 +21,27 @@ var triageKeywords = []struct {
 		[]string{"typo", "rename", "comment", "formatting", "small change"}},
 }
 
+// triageLevel is the pure heuristic, factored out so `eng workflow start`
+// can call it directly instead of going through cmdTriage's print/exit path.
+func triageLevel(text string) (level, workflowDesc string) {
+	lower := strings.ToLower(text)
+	for _, k := range triageKeywords {
+		for _, w := range k.words {
+			if strings.Contains(lower, w) {
+				return k.level, k.workflow
+			}
+		}
+	}
+	return "feature", "full spec + tasks + tests"
+}
+
 func cmdTriage(args []string) {
 	if len(args) == 0 {
 		fmt.Println(`Usage: eng triage "<request text>"`)
 		os.Exit(1)
 	}
-	text := strings.ToLower(strings.Join(args, " "))
-
-	for _, k := range triageKeywords {
-		for _, w := range k.words {
-			if strings.Contains(text, w) {
-				printTriage(k.level, k.workflow)
-				return
-			}
-		}
-	}
-	printTriage("feature", "full spec + tasks + tests")
-}
-
-func printTriage(level, workflow string) {
+	level, wf := triageLevel(strings.Join(args, " "))
 	fmt.Printf("Suggested level: %s\n", level)
-	fmt.Printf("Suggested workflow: %s\n", workflow)
+	fmt.Printf("Suggested workflow: %s\n", wf)
 	fmt.Println("\n(heuristic hint only — the Planner makes the final call)")
 }

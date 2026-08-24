@@ -1,0 +1,2 @@
+name: bug-fix
+stages: [triage, plan, execute, verify]

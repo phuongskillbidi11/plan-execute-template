@@ -61,3 +61,30 @@ PATH as part of that install, or have `hooks/default.yaml`'s commands resolve `e
 absolute path instead of assuming PATH.
 
 **From:** `.plans/2026-08-24-v2-harness-phase2/`
+
+**Resolved in Phase 3:** `eng install` now copies the running binary to
+`~/.engineering-harness/bin/` and prints (or, with `--add-to-path`, applies) the correct
+PATH setup for the current platform. See
+`.plans/2026-08-24-v2-harness-phase3/spec.md` Decision 8.
+
+### Go's `flag` package silently drops flags placed after a positional argument
+
+**Trap:** Writing a command as `eng plan review <plan-dir> --verdict PASS` looks natural —
+most CLIs accept flags in any position — but Go's standard `flag` package stops parsing at the
+first non-flag token. `<plan-dir>` is non-flag, so parsing stops there and `--verdict PASS`
+is silently left in `flagset.Args()`, never consumed.
+
+**Symptom:** The flag's default value is used instead, with no error — `eng plan new my-plan
+--risk high-risk` silently created a `feature`-risk plan (the default), and
+`eng plan review <dir> --verdict PASS` failed its own "verdict must be PASS or REJECT" check
+because `--verdict` was never actually parsed. Both looked like they ran successfully until the
+resulting `plan.yaml` was inspected.
+
+**Fix / rule:** Every `eng plan <subcommand>` that mixes a positional plan directory with
+flags (`new`, `review`, `approve`, `block`, `cancel`) runs its arguments through
+`reorderFlagsFirst` (`cli/plan_cmd.go`) before calling `flagset.Parse`, so flags and
+positional arguments work in either order. Any *new* `eng` subcommand that accepts both a flag
+and a positional argument must do the same — plain `flagset.Parse(args)` is only safe when
+flags are guaranteed to come first, which no user reliably does by habit.
+
+**From:** `.plans/2026-08-24-v2-harness-phase3/`

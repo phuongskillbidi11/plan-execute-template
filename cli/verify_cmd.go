@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"eng/internal/executil"
 	"eng/internal/gitutil"
 	"eng/internal/planmeta"
 	"eng/internal/project"
@@ -23,16 +24,31 @@ func cmdVerify(args []string) {
 		os.Exit(1)
 	}
 
+	pass, report, err := runVerify(planDir)
+	if err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
+	}
+
+	fmt.Println(report)
+	if !pass {
+		os.Exit(1)
+	}
+}
+
+// runVerify performs the actual verification and returns pass/fail plus the
+// report text, without calling os.Exit — factored out so `eng workflow
+// advance` can call it directly and decide what to do with the result
+// itself, rather than having the whole orchestrator process die on FAIL.
+func runVerify(planDir string) (bool, string, error) {
 	meta, err := planmeta.Load(planDir)
 	if err != nil {
-		fmt.Printf("no %s found in %s — nothing to verify\n", planmeta.FileName, planDir)
-		os.Exit(1)
+		return false, "", fmt.Errorf("no %s found in %s — nothing to verify", planmeta.FileName, planDir)
 	}
 
 	repoRoot, err := os.Getwd()
 	if err != nil {
-		fmt.Println("error:", err)
-		os.Exit(1)
+		return false, "", err
 	}
 
 	var report strings.Builder
@@ -61,12 +77,10 @@ func cmdVerify(args []string) {
 		}
 	}
 
-	if cfg, err := project.Load(repoRoot); err == nil && cfg.Stack.Test != "" {
-		fmt.Fprintf(&report, "\n## Test run\n\nCommand: `%s`\n\n", cfg.Stack.Test)
-		c := exec.Command("sh", "-c", cfg.Stack.Test)
-		c.Dir = repoRoot
-		out, testErr := c.CombinedOutput()
-		fmt.Fprintf(&report, "```\n%s\n```\n\n", string(out))
+	if cfg, err := project.Load(repoRoot); err == nil && !cfg.Stack.Test.Empty() {
+		fmt.Fprintf(&report, "\n## Test run\n\nCommand: `%s`\n\n", cfg.Stack.Test.String())
+		out, testErr := executil.Run(cfg.Stack.Test, repoRoot)
+		fmt.Fprintf(&report, "```\n%s\n```\n\n", out)
 		if testErr != nil {
 			fmt.Fprintf(&report, "Test command exited with error: %v\n\n", testErr)
 			pass = false
@@ -79,13 +93,15 @@ func cmdVerify(args []string) {
 	}
 	fmt.Fprintf(&report, "## Verdict: %s\n", verdict)
 
+	meta.Verification = planmeta.Verification{Verdict: verdict, VerifiedAt: time.Now().UTC().Format(time.RFC3339)}
+	if err := planmeta.Save(planDir, meta); err != nil {
+		return pass, report.String(), fmt.Errorf("verification ran but failed to persist to plan.yaml: %w", err)
+	}
+	planmeta.AppendEvent(planDir, "verified", verdict)
+
 	if err := os.WriteFile(filepath.Join(planDir, "verify-report.md"), []byte(report.String()), 0o644); err != nil {
-		fmt.Println("error writing report:", err)
-		os.Exit(1)
+		return pass, report.String(), err
 	}
 
-	fmt.Println(report.String())
-	if !pass {
-		os.Exit(1)
-	}
+	return pass, report.String(), nil
 }
