@@ -30,7 +30,17 @@ context, resolves relevant skills, writes a plan, and hands it to an Executor.
 
 ## Before writing spec.md
 
-1. Read the project's own context docs (`docs/src-map.md`, `docs/gotchas.md`, or
+1. Run Triage (see `core/triage/METHOD.md`) to determine the risk level.
+2. Read the project's own context docs (`docs/src-map.md`, `docs/gotchas.md`, or
    `docs/context/*` if present) — do not re-invent what's already documented.
-2. Resolve enabled skills (`eng skills list`) and load only the ones relevant to the request.
-3. Read prior `.plans/*/DECISION_LOG.md` entries touching the same area.
+3. Resolve enabled skills (`eng skills list`) and load only the ones relevant to the request.
+4. Read prior `.plans/*/DECISION_LOG.md` entries touching the same area.
+
+## After spec.md is confirmed
+
+1. Run `eng plan new <name> --risk <level>` to scaffold the plan folder and stamp
+   `plan.yaml` with the current git SHA.
+2. Fill in `plan.yaml`'s `write_scope` from `spec.md`'s "Affected files" table.
+3. If `.agent/project.yaml`'s `workflow.plan_review` is enabled (or the risk level is
+   `architecture`/`high-risk`, which makes it mandatory regardless), hand the plan to a
+   Plan Reviewer session before an Executor starts.

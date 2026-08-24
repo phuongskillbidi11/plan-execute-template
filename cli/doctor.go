@@ -28,14 +28,16 @@ func cmdDoctor(args []string) {
 		fmt.Println("Harness install:   NOT FOUND — run `eng install --from <path>`")
 	}
 
-	mode := project.DetectMode(dir)
-	switch mode {
+	modeResult := project.DetectModeResult(dir)
+	switch modeResult.Mode {
 	case "legacy":
 		fmt.Println("Project mode:      legacy (CLAUDE.md/.plans found, no .agent/) — fully compatible, no action required")
 	case "none":
 		fmt.Println("Project mode:      none — not yet initialized (`eng init` to enable)")
+	case "broken":
+		fmt.Printf("Project mode:      BROKEN — %s exists but failed to parse: %v\n", project.ConfigPath, modeResult.ParseErr)
 	default:
-		fmt.Printf("Project mode:      %s (.agent/project.yaml present)\n", mode)
+		fmt.Printf("Project mode:      %s (.agent/project.yaml present)\n", modeResult.Mode)
 	}
 
 	if cfg, err := project.Load(dir); err == nil {

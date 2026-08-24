@@ -674,6 +674,19 @@ cd /path/to/any/project
 
 See `.plans/2026-08-24-v2-harness-foundation/spec.md` for the full design.
 
+Phase 2 adds reliability primitives on top of the foundation above:
+
+```bash
+cd cli && go build -o eng .
+./eng plan new my-feature --risk feature   # scaffold + stamp plan.yaml with current git SHA
+./eng plan drift .plans/2026-08-24-my-feature   # OK or PLAN_DRIFT_DETECTED
+./eng verify .plans/2026-08-24-my-feature       # run tests, check diff, write verify-report.md
+./eng hooks run before_execute                  # run configured lifecycle hooks
+./eng triage "fix the login bug"                # heuristic risk-level hint
+```
+
+See `.plans/2026-08-24-v2-harness-phase2/spec.md` for the full design.
+
 ---
 
 ## Contributing

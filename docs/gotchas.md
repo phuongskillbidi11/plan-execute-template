@@ -40,9 +40,24 @@ the symptom.
 
 ## Entries
 
-<!--
-Delete this comment once the project has real entries. Add one gotcha per confirmed,
-non-obvious failure — not for every bug, only ones a fresh engineer would plausibly repeat.
--->
+### `eng hooks run` commands assume `eng` itself is on PATH
 
-_Nothing documented yet._
+**Trap:** `harness/hooks/default.yaml`'s built-in commands are written as `eng scan`,
+`eng plan drift .`, `eng verify .` — plain invocations of the CLI by name, the way you'd expect
+any installed tool to be called from a hook.
+
+**Symptom:** Running `eng hooks run <stage>` from a shell that only has the locally-built
+`cli/eng` binary (not on PATH) fails with `sh: line 1: eng: command not found` for every hook
+that shells out to `eng` itself — silent-looking until you notice the hook's `->` line printed
+the command that then immediately errored.
+
+**Fix / rule:** `eng install` only installs the harness *payload* (`core/`, `skills/`,
+`profiles/`, `templates/`, `hooks/`) into `~/.engineering-harness/` — it does not, and was
+never designed in Phase 1 or Phase 2 to, put the `eng` binary itself on PATH. Anyone using
+`eng hooks run` must put `eng` on PATH themselves (e.g. `go install` it, or add `cli/` to
+PATH during development) before hooks that reference `eng` by name will work. A future phase
+that builds a real `eng install`/`eng update` release pipeline should either put the binary on
+PATH as part of that install, or have `hooks/default.yaml`'s commands resolve `eng` via an
+absolute path instead of assuming PATH.
+
+**From:** `.plans/2026-08-24-v2-harness-phase2/`

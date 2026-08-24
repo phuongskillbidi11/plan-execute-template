@@ -1,0 +1,14 @@
+plan: YYYY-MM-DD-feature-name
+risk_level: feature   # quick-fix | bug | feature | architecture | high-risk
+planned_at:
+  git_sha: ""
+status: planned       # planned | reviewed | executing | verified | failed
+write_scope: []       # e.g. ["src/api/**", "tests/api/**"] — from spec.md's Affected files
+retry:
+  build: 0
+  unit_test: 0
+  integration_test: 0
+retry_budget:
+  build: 2
+  unit_test: 2
+  integration_test: 1

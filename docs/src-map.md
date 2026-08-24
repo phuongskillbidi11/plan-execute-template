@@ -82,3 +82,31 @@ frontmatter still resolve via the legacy `# Skill:` heading convention — see
 `cli/internal/skills/skills.go`.
 
 From: `.plans/2026-08-24-v2-harness-foundation/`
+
+### `cli/internal/planmeta/`, `cli/internal/gitutil/`, `cli/internal/hooks/` — Phase 2 plan lifecycle state
+
+What it does: `planmeta` reads/writes each plan's `plan.yaml` (git SHA, risk level, write
+scope, retry counters/budget); `gitutil` wraps `git rev-parse`/`git diff` for drift checks;
+`hooks` loads the lifecycle hook table (`harness/hooks/default.yaml`, project-overridable via
+`.agent/hooks.yaml`).
+
+Key files: `cli/plan_cmd.go` (`eng plan new/drift/retry`), `cli/verify_cmd.go` (`eng verify`),
+`cli/hooks_cmd.go` (`eng hooks run`)
+
+Notable: `eng verify` and `eng hooks run` shell out via `sh -c` — requires a POSIX shell on
+PATH (Git Bash's `sh.exe` on Windows), same dependency V1's own scripts always had. Separately,
+`harness/hooks/default.yaml`'s built-in commands (`eng scan`, `eng plan drift .`, `eng verify
+.`) assume the `eng` binary itself is on PATH — nothing in Phase 1 or Phase 2 installs `eng`
+onto PATH (only `eng install` puts the harness *payload* in `~/.engineering-harness/`); a
+project using `eng hooks run` today must put `eng` on PATH itself.
+
+From: `.plans/2026-08-24-v2-harness-phase2/`
+
+### `harness/core/triage/`, `harness/core/plan-reviewer/`, `harness/core/verifier/` — new roles
+
+What it does: methodology docs for the three roles Phase 2 adds around the existing
+Planner/Executor loop. None of them are enforced by code — `review.md` and
+`verify-report.md` are the enforcement surface (a file with a clear verdict), not a gate a
+script can close.
+
+From: `.plans/2026-08-24-v2-harness-phase2/`

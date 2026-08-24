@@ -22,6 +22,14 @@ func main() {
 		cmdScan(os.Args[2:])
 	case "skills":
 		cmdSkills(os.Args[2:])
+	case "plan":
+		cmdPlan(os.Args[2:])
+	case "verify":
+		cmdVerify(os.Args[2:])
+	case "hooks":
+		cmdHooks(os.Args[2:])
+	case "triage":
+		cmdTriage(os.Args[2:])
 	default:
 		usage()
 		os.Exit(1)
@@ -36,5 +44,11 @@ Commands:
   init                    Initialize the current directory as a harness-aware project
   doctor                  Report harness install status, project mode, and resolved skills
   scan                    Print detected stack and a file summary
-  skills list             List resolved skills (global + project-local)`)
+  skills list             List resolved skills (global + project-local)
+  plan new <name> [--risk <level>]   Scaffold a plan and stamp it with the current git SHA
+  plan drift [dir]                   Check whether relevant files changed since planning
+  plan retry <dir> <stage>           Track a retry against this plan's budget
+  verify [dir]                       Run tests, check the git diff, write verify-report.md
+  hooks run <stage>                  Run the configured hooks for a lifecycle stage
+  triage "<text>"                    Heuristic risk-level hint (not authoritative)`)
 }

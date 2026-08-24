@@ -1,0 +1,22 @@
+before_plan:
+  - project_scan
+after_plan:
+  - plan_review
+before_execute:
+  - drift_check
+after_task:
+  - test
+after_execute:
+  - regression_test
+  - verify
+on_failure:
+  - collect_logs
+
+commands:
+  project_scan: "eng scan"
+  plan_review: ""              # performed by the Plan Reviewer role, not a shell command
+  drift_check: "eng plan drift ."
+  test: "${test_cmd}"
+  regression_test: "${test_cmd}"
+  verify: "eng verify ."
+  collect_logs: ""             # performed by the Executor writing errors.log, not a shell command
