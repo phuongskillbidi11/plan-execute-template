@@ -7,6 +7,8 @@
 
 ## Phase 1 — Understand codebase state (5 min)
 
+- [ ] Read docs/src-map.md → what already exists in the source tree? Do not re-invent it.
+- [ ] Read docs/gotchas.md → any listed trap in the area this touches?
 - [ ] Read CLAUDE.md → ## Current state — what exists right now?
 - [ ] Read previous sprint-summary.md — what was discovered?
 - [ ] Load relevant skills from skills/manifest.json

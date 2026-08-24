@@ -59,6 +59,28 @@ sufficient unless the feature is purely a build-time concern.
 
 ---
 
+## Codebase map — read before planning
+
+Before `skills/manifest.json`, before `spec.md`, read:
+
+1. **`docs/src-map.md`** — what already exists in the project's source tree, one section per
+   module, each with a `.plans/` cross-reference. Do not re-invent any of it; extend or call
+   what's documented there. If your feature genuinely needs to replace something documented
+   here, say so explicitly in `spec.md`'s design decisions and explain why the existing
+   version doesn't work — don't silently duplicate it.
+2. **`docs/gotchas.md`** — failures that already cost time on this project, most of them
+   silent. Design around a listed gotcha rather than rediscovering it live.
+
+Both start empty (created by `scripts/init.sh`) and grow one entry per sprint. **If this plan
+adds a new module/file to the source tree, or changes what an existing `src-map.md` entry
+describes, the last task in `tasks.md` must update `docs/src-map.md`** — one line, not its own
+multi-hour task; put it after the feature's own tasks so the map reflects what actually
+landed. If the Executor's run on this plan surfaces a real, non-obvious defect — not a
+task written ambiguously, a genuine "the obvious approach silently does the wrong thing" —
+add an entry to `docs/gotchas.md` as part of closing out the plan.
+
+---
+
 ## Skill system — load before planning
 
 This project has a `skills/` directory containing domain-specific knowledge
@@ -197,6 +219,8 @@ Mark `[x]` when done.
 - If inserting code, include the exact code block to insert
 - If replacing code, include both the old snippet and the new snippet
 - Never write "update X to handle Y" — write exactly what to change
+- If this plan adds a new module/file or changes what an existing `docs/src-map.md` entry
+  describes, the last task updates `docs/src-map.md` (see "Codebase map" above)
 
 ---
 

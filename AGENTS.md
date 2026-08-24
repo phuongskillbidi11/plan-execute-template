@@ -161,10 +161,20 @@ Claude Code in executor mode). Never write implementation code yourself.
 
 ### Before writing any plan
 
-1. Read `skills/manifest.json` to see available skills
-2. If the request matches a skill, read that skill's `SKILL.md`
-3. Write `spec.md` first — no exceptions
-4. Only after spec is confirmed, write `tasks.md` and `tests.md`
+1. Read `docs/src-map.md` — what already exists in the source tree. Do not re-invent any of
+   it; extend or call what's documented there.
+2. Read `docs/gotchas.md` — failures that already cost time on this project, most of them
+   silent. Design around a listed gotcha rather than rediscovering it.
+3. Read `skills/manifest.json` to see available skills
+4. If the request matches a skill, read that skill's `SKILL.md`
+5. Write `spec.md` first — no exceptions
+6. Only after spec is confirmed, write `tasks.md` and `tests.md`
+
+If the plan adds a new module/file to the source tree, or changes what an existing
+`docs/src-map.md` entry describes, the **last task** in `tasks.md` must update
+`docs/src-map.md` — a one-line addition, not its own multi-hour task. If your own Executor
+run (in Executor mode) surfaces a real, non-obvious defect, add an entry to
+`docs/gotchas.md` as part of closing out the plan.
 
 ### Plan folder structure
 
@@ -262,6 +272,9 @@ Read `CLAUDE.md` before starting any task — it contains:
 - Key files table
 - Coding conventions specific to this project
 - Current state (completed sprints, known issues, decisions made)
+
+`docs/src-map.md` and `docs/gotchas.md` carry the detail `CLAUDE.md`'s own Key files table is
+too short for — read both in Planner mode, before `spec.md` (see above).
 
 Skills with deeper domain knowledge live in `skills/` — load only the relevant one.
 

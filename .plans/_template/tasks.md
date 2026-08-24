@@ -84,6 +84,8 @@
 - [ ] No tasks marked `[!]`
 - [ ] Build passes
 - [ ] All tests pass
+- [ ] `docs/src-map.md` updated if this sprint added/changed what exists in the source tree
+- [ ] `docs/gotchas.md` updated if a real, non-obvious defect surfaced during this sprint
 - [ ] Sprint summary written to `.plans/[folder]/sprint-summary.md`
 
 ---
