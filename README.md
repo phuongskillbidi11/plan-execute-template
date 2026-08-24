@@ -15,7 +15,11 @@
 
 Most AI-assisted development fails not because the AI can't code, but because it starts coding before the problem is understood. This template enforces a clean separation: **Claude thinks, the Executor implements.**
 
-**Claude (Planner)** reads the codebase, asks clarifying questions, and produces a three-file plan: `spec.md` (what and why), `tasks.md` (exact ordered checklist with file paths and line numbers), and `tests.md` (unambiguous pass/fail criteria). Claude never touches source code.
+**Claude (Planner)** reads the codebase — including the living `docs/src-map.md` and
+`docs/gotchas.md` (see below), so it doesn't re-discover or re-invent what already exists —
+asks clarifying questions, and produces a three-file plan: `spec.md` (what and why), `tasks.md`
+(exact ordered checklist with file paths and line numbers), and `tests.md` (unambiguous
+pass/fail criteria). Claude never touches source code.
 
 **The Executor** reads the plan, implements one task at a time, runs the specified test after each task, marks it complete, and stops the moment a test fails — reporting the exact error back to you. You relay that error to Claude, Claude revises only the failing task, and the loop continues.
 
@@ -110,6 +114,8 @@ Target: /home/user/projects/my-project
   [OK]  Created CLAUDE.md
   [OK]  Created .github/copilot-instructions.md
   [OK]  Created AGENTS.md
+  [OK]  Created docs/src-map.md
+  [OK]  Created docs/gotchas.md
 
 → Detecting project type...
    Detected: nodejs
@@ -134,6 +140,11 @@ Open `CLAUDE.md` and complete the sections the script could not auto-fill:
 - **Current state** — update after each sprint; Claude reads this before planning
 
 This is the most important step. The more context you give Claude here, the more accurate its plans will be.
+
+`docs/src-map.md` and `docs/gotchas.md` are created empty — leave them that way at setup.
+They grow one entry per sprint from here on: the last task of a plan that adds a new module
+updates `src-map.md`; a plan whose Executor run surfaces a real, non-obvious defect adds an
+entry to `gotchas.md`. See `## Codebase map — read before planning` in `CLAUDE.md`.
 
 ### Step 4 — Enable your executor
 
@@ -322,6 +333,38 @@ When a task is marked `[!]`, follow this structured relay:
 5. **Resume the executor** — give it the updated `tasks.md`
 
 The relay template is executor-agnostic — it works for Copilot, Codex, and Claude Code executor mode. Replace "Copilot" in the template with whichever executor you're using.
+
+---
+
+## Codebase map (`docs/src-map.md` and `docs/gotchas.md`)
+
+Two living documents that stop a plan from re-inventing code or repeating a mistake the
+project already paid for once:
+
+- **`docs/src-map.md`** — what already exists in the project's source tree, one short section
+  per module (what it does, key files, any non-obvious design decision, and the `.plans/`
+  folder that introduced it). Claude reads this before writing every `spec.md`.
+- **`docs/gotchas.md`** — failures that already cost time, most of them silent (wrong output,
+  not a crash). Claude reads this before writing every `spec.md` too.
+
+Both are created **empty** by `scripts/init.sh` — there's nothing to fill in at setup. They
+grow one entry at a time, as a normal part of finishing a plan:
+
+- If a plan adds a new module/file to the source tree, its `tasks.md`'s **last task** updates
+  `docs/src-map.md` — a one-line addition, not a separate cleanup pass.
+- If a plan's Executor run surfaces a real, non-obvious defect (not a badly-worded task — a
+  genuine "the obvious approach silently does the wrong thing"), Claude adds an entry to
+  `docs/gotchas.md` when closing out that plan.
+
+This is why the map stays accurate instead of going stale like a one-time-filled "Architecture"
+section: it's updated by the same mechanism that already ships every feature, not by a
+separate documentation sprint nobody schedules.
+
+**Why this matters more than it looks:** without it, every new Planner session has to
+re-discover the codebase from scratch, which risks writing a second version of something
+that already exists. This is the single biggest source of avoidable rework in long-running,
+many-sprint projects using this workflow — worth reading in full before every `spec.md`, not
+skimmed.
 
 ---
 
@@ -578,6 +621,10 @@ ai-planner-executor/
 │
 ├── .planner-executor/
 │   └── config.yaml.template              ← copy → config.yaml, fill in values
+│
+├── docs/
+│   ├── src-map.md                        ← living map of what exists in src/, grows per sprint
+│   └── gotchas.md                        ← non-obvious failures already paid for, grows per sprint
 │
 ├── scripts/
 │   ├── init.sh                           ← one-command setup

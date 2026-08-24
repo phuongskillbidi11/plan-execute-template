@@ -55,6 +55,10 @@ Claude Code uses this to avoid touching unrelated files.]
 | `path/to/file.ext` | Create | [why] |
 | `path/to/file.ext` | Modify | [what changes] |
 
+> If this sprint adds a new module/file to the source tree, or changes what an existing
+> `docs/src-map.md` entry describes, list `docs/src-map.md` here too (Modify) — its own
+> update becomes `tasks.md`'s last task. See `docs/src-map.md`'s own "How to use this file".
+
 ---
 
 ## Risks and unknowns

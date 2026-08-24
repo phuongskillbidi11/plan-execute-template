@@ -65,6 +65,28 @@ searching. Example:]
 | `src/config.[ext]` | Configuration loading |
 | `[path/to/core]` | [Core module description] |
 
+> This table is a quick-glance list, filled in once at setup. For the living, per-module
+> detail that actually prevents re-inventing code, see **`docs/src-map.md`** below — it grows
+> with every sprint instead of going stale.
+
+---
+
+## Codebase map — read before planning
+
+Before writing `spec.md`, read:
+
+1. **`docs/src-map.md`** — what already exists in the project's source tree, one section per
+   module. Do not re-invent any of it; extend or call what's documented there.
+2. **`docs/gotchas.md`** — failures that already cost time on this project, most of them
+   silent. Design around a listed gotcha rather than rediscovering it.
+
+Both files start empty (created by `scripts/init.sh`) and grow one entry per sprint — see each
+file's own "How to use this file" section for the exact rule. **If your plan adds a new
+module/file to the source tree, or changes what an existing entry describes, the last task in
+`tasks.md` must update `docs/src-map.md`.** If your plan's own Executor run surfaces a real,
+non-obvious defect (not a badly-worded task), add an entry to `docs/gotchas.md` as part of
+closing out the plan.
+
 ---
 
 ## Coding conventions

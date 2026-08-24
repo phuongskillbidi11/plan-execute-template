@@ -100,6 +100,14 @@ copy_if_missing \
     "$TEMPLATE_DIR/ROADMAP.md" \
     "$TARGET_DIR/ROADMAP.md"
 
+copy_if_missing \
+    "$TEMPLATE_DIR/docs/src-map.md" \
+    "$TARGET_DIR/docs/src-map.md"
+
+copy_if_missing \
+    "$TEMPLATE_DIR/docs/gotchas.md" \
+    "$TARGET_DIR/docs/gotchas.md"
+
 # -- Project detection --------------------------------------------------------
 echo ""
 echo "→ Detecting project type..."
@@ -164,8 +172,10 @@ echo "Done. Next steps:"
 echo ""
 echo "  1. Review .planner-executor/config.yaml — correct any wrong commands"
 echo "  2. Fill in CLAUDE.md: architecture, key files, coding conventions"
-echo "  3. (Optional) /plugin install andrej-karpathy-skills@karpathy-skills"
-echo "  4. Ask Claude: 'Create a plan for <feature>. Save to .plans/'"
+echo "  3. docs/src-map.md and docs/gotchas.md start empty — they grow one entry per"
+echo "     sprint from here on (see each file's own \"How to use this file\")"
+echo "  4. (Optional) /plugin install andrej-karpathy-skills@karpathy-skills"
+echo "  5. Ask Claude: 'Create a plan for <feature>. Save to .plans/'"
 echo ""
 
 if [[ "${DETECTED_TYPE:-unknown}" == "unknown" ]]; then
