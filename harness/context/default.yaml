@@ -1,0 +1,6 @@
+strategy: selective
+max_skills: 5
+max_docs: 8
+max_log_lines: 300
+include_completed_tasks: false
+summarize_tool_output: true

@@ -12,6 +12,12 @@ Run `eng verify [plan-dir]` after the Executor reports all tasks `[x]`. This:
 3. Runs the project's test command (`.agent/project.yaml`'s `stack.test_cmd`).
 4. Writes `verify-report.md` with a PASS/FAIL verdict.
 
+## Full tool output
+
+`eng verify`'s report shows a bounded head+tail summary of the test command's output. If
+that isn't enough to diagnose a FAIL, the complete output is at
+`.agent/logs/verify-<timestamp>.log` (the report names the exact path when truncated).
+
 ## Constraint
 
 Never modify source files. If verification FAILs, report it — do not attempt a fix. That is

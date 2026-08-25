@@ -31,10 +31,14 @@ context, resolves relevant skills, writes a plan, and hands it to an Executor.
 ## Before writing spec.md
 
 1. Run Triage (see `core/triage/METHOD.md`) to determine the risk level.
-2. Read the project's own context docs (`docs/src-map.md`, `docs/gotchas.md`, or
+2. Run `eng context bundle planner <plan-dir> "<request text>"` (see
+   `core/context-manager/METHOD.md`) for a curated set of matching project context and
+   skills — read the full `docs/src-map.md`/`docs/gotchas.md` only if the bundle's fail-safe
+   rule triggers (nothing scored a match).
+3. Read the project's own context docs (`docs/src-map.md`, `docs/gotchas.md`, or
    `docs/context/*` if present) — do not re-invent what's already documented.
-3. Resolve enabled skills (`eng skills list`) and load only the ones relevant to the request.
-4. Read prior `.plans/*/DECISION_LOG.md` entries touching the same area.
+4. Resolve enabled skills (`eng skills list`) and load only the ones relevant to the request.
+5. Read prior `.plans/*/DECISION_LOG.md` entries touching the same area.
 
 ## After spec.md is confirmed
 

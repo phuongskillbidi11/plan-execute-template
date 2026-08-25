@@ -38,6 +38,8 @@ func main() {
 		cmdCapabilities(os.Args[2:])
 	case "start":
 		cmdStart(os.Args[2:])
+	case "context":
+		cmdContext(os.Args[2:])
 	default:
 		usage()
 		os.Exit(1)
@@ -64,5 +66,9 @@ Commands:
   workflow advance [dir]             Mechanically apply the next safe transition
   adapter prompt <role> <dir>        Print the assembled prompt for an agent session
   capabilities list                  Report which known tools are on PATH
-  start                              Run doctor, then launch the configured agent`)
+  start                              Run doctor, then launch the configured agent
+  context skills "<text>"            Show the skills selected for a request
+  context project "<text>"           Show matching docs/src-map.md and docs/gotchas.md sections
+  context task <plan-dir>            Show the current task and goal summary
+  context bundle <role> <plan-dir>   Compose role-specific context and write a manifest`)
 }

@@ -80,7 +80,17 @@ func runVerify(planDir string) (bool, string, error) {
 	if cfg, err := project.Load(repoRoot); err == nil && !cfg.Stack.Test.Empty() {
 		fmt.Fprintf(&report, "\n## Test run\n\nCommand: `%s`\n\n", cfg.Stack.Test.String())
 		out, testErr := executil.Run(cfg.Stack.Test, repoRoot)
-		fmt.Fprintf(&report, "```\n%s\n```\n\n", out)
+
+		ctxCfg := loadContextConfig(repoRoot)
+		logPath, logErr := writeFullLog(repoRoot, "verify", out)
+		display := out
+		if ctxCfg.SummarizeToolOutput {
+			display = summarizeOutput(out, ctxCfg.MaxLogLines)
+		}
+		fmt.Fprintf(&report, "```\n%s\n```\n\n", display)
+		if logErr == nil && display != out {
+			fmt.Fprintf(&report, "Full output: `%s`\n\n", logPath)
+		}
 		if testErr != nil {
 			fmt.Fprintf(&report, "Test command exited with error: %v\n\n", testErr)
 			pass = false
@@ -104,4 +114,41 @@ func runVerify(planDir string) (bool, string, error) {
 	}
 
 	return pass, report.String(), nil
+}
+
+// writeFullLog persists the complete tool output to .agent/logs/, keeping
+// the report/stdout bounded regardless of test-suite size (Requirement 8).
+func writeFullLog(repoRoot, kind, content string) (string, error) {
+	dir := filepath.Join(repoRoot, ".agent", "logs")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	name := fmt.Sprintf("%s-%s.log", kind, time.Now().UTC().Format("20060102-150405"))
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// summarizeOutput bounds out to maxLines by keeping the head and tail —
+// deliberately not head-only, since failures are conventionally reported
+// at the end of test output. Line-count based, not token-based, per
+// Requirement 7's explicit instruction not to hard-code token counts to a
+// single model.
+func summarizeOutput(out string, maxLines int) string {
+	if maxLines <= 0 {
+		return out
+	}
+	lines := strings.Split(out, "\n")
+	if len(lines) <= maxLines {
+		return out
+	}
+	half := maxLines / 2
+	head := lines[:half]
+	tail := lines[len(lines)-half:]
+	omitted := len(lines) - len(head) - len(tail)
+	return strings.Join(head, "\n") +
+		fmt.Sprintf("\n... [%d lines omitted, see full log] ...\n", omitted) +
+		strings.Join(tail, "\n")
 }

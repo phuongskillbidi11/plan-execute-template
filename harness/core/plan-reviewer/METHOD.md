@@ -8,6 +8,11 @@ Independent review between Planner and Executor. Read-only with respect to `spec
 Read the plan the same way the Executor will, and try to find what the Planner missed before
 an Executor spends real time on it.
 
+## Before reviewing
+
+Run `eng context bundle plan-reviewer <plan-dir>` for the plan's risk/approval facts plus
+matching project context, in addition to reading `spec.md`/`tasks.md`/`tests.md` directly.
+
 ## Checklist (from `harness/templates/plan/review.md`)
 
 - **Missing requirements** — does `spec.md`'s Goal fully cover what the request asked for?

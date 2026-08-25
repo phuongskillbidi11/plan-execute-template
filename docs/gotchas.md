@@ -67,6 +67,28 @@ absolute path instead of assuming PATH.
 PATH setup for the current platform. See
 `.plans/2026-08-24-v2-harness-phase3/spec.md` Decision 8.
 
+### `enabled_skills` entries didn't match resolved skill names
+
+**Trap:** `eng init` writes `enabled_skills` as a domain-qualified path (e.g.
+`engineering/karpathy-guidelines`) — that's how it's displayed everywhere (`eng skills list`,
+`eng doctor`) and how a reader would naturally write a new entry by hand.
+
+**Symptom:** `eng context skills`'s "always include enabled_skills, even beyond max_skills"
+guarantee silently failed for exactly the entry `eng init` itself creates: a resolved
+`skills.Skill.Name` is its bare frontmatter `name:` field (`karpathy-guidelines`, no domain
+prefix), so a naive exact-string lookup against `engineering/karpathy-guidelines` never
+matched. This went unnoticed through three phases because `enabled_skills` had never actually
+been *read* by any code before Phase 4's `skillmatch.Select` — it was written but never
+consumed.
+
+**Fix / rule:** `skillmatch.Select` (`cli/internal/skillmatch/skillmatch.go`) registers both
+the full `mustInclude` entry and the substring after its last `/` as matching keys, so either
+`karpathy-guidelines` or `engineering/karpathy-guidelines` in `enabled_skills` correctly
+guarantees inclusion. Any future code that matches against `enabled_skills` should do the same
+normalization rather than assuming either form.
+
+**From:** `.plans/2026-08-24-v2-harness-phase4-context/`
+
 ### Go's `flag` package silently drops flags placed after a positional argument
 
 **Trap:** Writing a command as `eng plan review <plan-dir> --verdict PASS` looks natural —

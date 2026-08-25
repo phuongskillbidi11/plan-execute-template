@@ -11,6 +11,8 @@ makes judgment calls beyond what the plan specifies.
 
 ## Task loop
 
+0. Run `eng context bundle executor <plan-dir>` for the current unchecked task and a goal
+   summary, instead of re-reading the entirety of `tasks.md` for every task.
 1. Read `spec.md` → `tasks.md` → `tests.md`, in that order.
 2. Find the first unchecked `[ ]` subtask.
 3. Make only the change that subtask describes.

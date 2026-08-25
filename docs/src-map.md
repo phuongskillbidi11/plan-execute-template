@@ -132,3 +132,29 @@ cannot reach `EXECUTING` while it's set and unapproved (verified end-to-end in t
 `eng plan review <dir> --verdict PASS`) — see `docs/gotchas.md`.
 
 From: `.plans/2026-08-24-v2-harness-phase3/`
+
+### `cli/internal/contextcfg/`, `cli/internal/skillmatch/`, `cli/internal/docsearch/`, `cli/internal/taskscope/` — Phase 4 context selection
+
+What it does: `contextcfg` loads the optional `.agent/context.yaml` budget (falling back to
+`harness/context/default.yaml`, then hard-coded defaults); `skillmatch` finally makes
+Phase 1's `tags`/`triggers` skill-frontmatter fields load-bearing by scoring them against a
+request; `docsearch` parses `docs/src-map.md`/`docs/gotchas.md`'s existing `### ` sections
+and keyword-matches them; `taskscope` extracts just the current unchecked task block and
+`spec.md`'s Goal summary instead of whole files.
+
+Key files: `cli/context_cmd.go` (`eng context skills/project/task/bundle`)
+
+Notable: `enabled_skills` (Phase 1) is always included by `skillmatch.Select` regardless of
+`max_skills` — the cap only limits additional discovered-but-not-required skills. A real
+defect was found and fixed during this plan's own execution: `eng init` writes
+`enabled_skills` entries as `domain/name` (e.g. `engineering/karpathy-guidelines`), but a
+resolved skill's `Name` is its bare frontmatter name (`karpathy-guidelines`) — the "always
+included" guarantee silently failed for exactly the entry `eng init` itself creates, until
+`skillmatch.Select` was fixed to also register each entry's basename. `eng verify`'s test
+output is now capped (`max_log_lines`, default 300, head+tail) with the full output written
+to `.agent/logs/` — `eng workflow advance`'s gating logic is unaffected since it only ever
+reads `plan.yaml`'s `verification.verdict`, not the report text.
+
+From: `.plans/2026-08-24-v2-harness-phase4-context/`
+
+From: `.plans/2026-08-24-v2-harness-phase3/`

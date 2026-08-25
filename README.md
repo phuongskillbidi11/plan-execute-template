@@ -703,6 +703,18 @@ cd cli && go build -o eng .
 
 See `.plans/2026-08-24-v2-harness-phase3/spec.md` for the full design.
 
+Phase 4 adds context selection so the harness maximizes relevant context, not total context:
+
+```bash
+cd cli && go build -o eng .
+./eng context skills "add Modbus TCP monitoring"
+./eng context project "add Modbus TCP monitoring"
+./eng context task .plans/2026-08-24-my-feature
+./eng context bundle executor .plans/2026-08-24-my-feature
+```
+
+See `.plans/2026-08-24-v2-harness-phase4-context/spec.md` for the full design.
+
 ---
 
 ## Contributing
