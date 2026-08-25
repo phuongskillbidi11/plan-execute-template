@@ -8,7 +8,7 @@ import (
 // Known is the fixed set of capabilities eng can detect today. Device/
 // protocol capabilities (serial, Modbus, OPC UA, ...) are explicitly
 // deferred to a later phase alongside the MCP adapter layer they'd serve.
-var Known = []string{"git", "claude", "codex", "docker"}
+var Known = []string{"git", "claude", "codex", "docker", "gh"}
 
 // Detect reports whether name's executable is found on PATH.
 func Detect(name string) bool {

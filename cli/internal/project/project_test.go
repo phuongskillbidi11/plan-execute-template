@@ -8,6 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"eng/internal/executil"
+	"eng/internal/toolpolicy"
 )
 
 func TestDetectModeLegacy(t *testing.T) {
@@ -170,5 +171,40 @@ func TestDomainsAndPrivateSkillsPathRoundTrip(t *testing.T) {
 	}
 	if len(got.Domains) != 2 || got.Domains[0] != "embedded" || got.Domains[1] != "automation" || got.PrivateSkillsPath != "../company-skills" {
 		t.Fatalf("round-trip mismatch: %+v", got)
+	}
+}
+
+func TestToolsPolicyDefaultsToEmpty(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{ProjectName: "x", Mode: "modern"}
+	if err := Save(dir, cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Tools.Allow) != 0 || len(got.Tools.Deny) != 0 || len(got.Tools.RequireApproval) != 0 {
+		t.Fatalf("expected empty tool policy by default, got %+v", got.Tools)
+	}
+}
+
+func TestToolsPolicyRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{ProjectName: "x", Mode: "modern", Tools: toolpolicy.Policy{
+		Allow:           []string{"git.status"},
+		RequireApproval: []string{"github.issue.comment"},
+		Deny:            []string{"git.force_push"},
+	}}
+	if err := Save(dir, cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Tools.Allow) != 1 || got.Tools.Allow[0] != "git.status" ||
+		len(got.Tools.RequireApproval) != 1 || len(got.Tools.Deny) != 1 {
+		t.Fatalf("round-trip mismatch: %+v", got.Tools)
 	}
 }

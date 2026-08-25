@@ -10,7 +10,9 @@
 > `.plans/2026-08-24-v2-harness-phase5-runtime/` (natural-language runtime routing, Quick
 > Fix/Spec-First workflows, log retention, Agent/Tool adapter separation), and
 > `.plans/2026-08-25-v2-harness-phase6-skills/` (multi-domain skill ecosystem, dependency
-> graph, skill router) — see those plans for the current architecture.
+> graph, skill router), and `.plans/2026-08-25-v2-harness-phase7-tools/` (tool/MCP adapter
+> runtime, capability/risk model, role permission enforcement, audited invocation) — see
+> those plans for the current architecture.
 
 Phases are ordered by value-to-complexity ratio. Each phase is independent —
 you can skip ahead or implement phases in a different order. Every enhancement

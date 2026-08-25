@@ -8,7 +8,7 @@ triggers: [debug, bug, crash, broken, "not working", error, fails, reproduce]
 version: "1.0.0"
 requires: []
 recommends: []
-capabilities: []
+capabilities: [docs.search]
 conflicts: []
 when_to_use: Any time something behaves unexpectedly and the cause isn't already known.
 when_not_to_use: A requirement that's still being designed — that's planning, not debugging.
@@ -26,6 +26,8 @@ fixes.
 1. **Reproduce** — get a reliable, minimal repro before touching any code.
 2. **Isolate** — bisect the change/input space until the smallest failing case is known.
 3. **Form a hypothesis** — state what you believe is wrong and how you'd know if you're right.
+   Searching `docs/gotchas.md`/prior notes for a similar symptom (via `docs.search`, when
+   available) often shortcuts straight to a known cause.
 4. **Verify** — test the hypothesis directly (a log line, a debugger breakpoint, a targeted
    assertion) before writing the fix.
 5. **Fix at the cause**, not the symptom — and add a regression test that would have caught it.

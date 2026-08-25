@@ -8,7 +8,10 @@ work, so the harness maximizes *relevant* context instead of total context.
 Skill selection itself is delegated to `internal/skillrouter.Route` (Phase 6) — explicit
 project skills and their dependencies first, then request matches, domain-profile fills,
 and recommendations, all budget-aware and explained. This is still the *only* place skill
-selection happens; no role prompt or adapter re-implements it.
+selection happens; no role prompt or adapter re-implements it. The composed bundle also
+includes a `## Tools` section for the roles that receive `## Skills` (Planner, Executor),
+driven by those same selected skills' `capabilities:` field and routed through
+`internal/toolrouter.Route` (Phase 7) — the harness's one authoritative tool-selection path.
 
 `eng context bundle <role> <plan-dir> ["<request text>"]` composes:
 

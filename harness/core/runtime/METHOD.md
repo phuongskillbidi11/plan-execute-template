@@ -31,6 +31,13 @@ expected default typing surface for a normal request.
    `eng context bundle` output automatically.
 5. Never skip a printed gate (`NEEDS_SPEC_APPROVAL`, `NEEDS_APPROVAL`) — stop and ask the
    human explicitly, in the conversation, before proceeding past one.
+6. Before a request that plausibly needs an external capability (reading a PR, searching
+   docs, inspecting a container, ...), run `eng capabilities explain <role> <plan-dir>
+   "<request text>"` to see what would route and at what verdict (`ALLOWED`/
+   `NEEDS_APPROVAL`/`BLOCKED`) before doing anything. The only sanctioned way to actually
+   invoke one is `eng tools invoke <role> <capability> <plan-dir> [args...]` — never a raw
+   shell command to an external service inside a session. A `NEEDS_APPROVAL` result means
+   stop and ask the human, exactly like any other approval gate in this document.
 
 ## Quick Fix path
 

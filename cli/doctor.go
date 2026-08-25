@@ -61,6 +61,16 @@ func cmdDoctor(args []string) {
 		fmt.Println("  (run `eng skills list` or `eng skills validate` for detail)")
 	}
 
+	adapters := registeredAdapters(dir)
+	fmt.Println("\nTools:")
+	for _, a := range adapters {
+		status := "unavailable"
+		if a.Available() {
+			status = "available"
+		}
+		fmt.Printf("  %-10s %-12s [%d capabilities]\n", a.Name(), status, len(a.Capabilities()))
+	}
+
 	fmt.Println("\nCapabilities:")
 	for _, name := range capabilities.Known {
 		status := "unavailable"

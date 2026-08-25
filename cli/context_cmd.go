@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 	"eng/internal/skillrouter"
 	"eng/internal/skills"
 	"eng/internal/taskscope"
+	"eng/internal/toolpolicy"
+	"eng/internal/toolrouter"
 )
 
 func cmdContext(args []string) {
@@ -99,6 +102,55 @@ func writeSkillSelection(w io.Writer, sel skillrouter.Selection, total int, cfg 
 	}
 	if len(sel.Skills) < total {
 		fmt.Fprintf(w, "\n%d skill(s) omitted as not relevant to this request.\n", total-len(sel.Skills))
+	}
+}
+
+// routeTools computes the tool-routing result for a request's selected
+// skills — the Requirement 28 signal connecting Skill Router output to
+// Tool Router input, with no capability-detection logic of its own
+// (Phase 7 spec.md, out-of-scope: no NL-to-capability detection beyond
+// this). Shared by buildContextBundle's ## Tools section and `eng
+// capabilities explain`.
+func routeTools(repoRoot, role, request string, approved bool) toolrouter.Result {
+	cfg := loadContextConfig(repoRoot)
+	sel, _, err := selectSkills(repoRoot, request, cfg)
+
+	seen := map[string]bool{}
+	var required []string
+	if err == nil {
+		for _, s := range sel.Skills {
+			for _, c := range s.Capabilities {
+				if !seen[c] {
+					seen[c] = true
+					required = append(required, c)
+				}
+			}
+		}
+	}
+	sort.Strings(required)
+
+	var policy toolpolicy.Policy
+	if pcfg, err := project.Load(repoRoot); err == nil {
+		policy = pcfg.Tools
+	}
+	adapters := registeredAdapters(repoRoot)
+	return toolrouter.Route(required, adapters, role, policy, approved)
+}
+
+func writeToolSelection(w io.Writer, result toolrouter.Result) {
+	fmt.Fprintf(w, "\n## Tools\n")
+	if len(result.Allowed) == 0 && len(result.NeedsApproval) == 0 && len(result.Blocked) == 0 {
+		fmt.Fprintf(w, "(no external capabilities requested by the selected skills)\n")
+		return
+	}
+	for _, s := range result.Allowed {
+		fmt.Fprintf(w, "- %s (%s) ALLOWED — %s\n", s.Capability, s.Adapter, s.Reason)
+	}
+	for _, b := range result.NeedsApproval {
+		fmt.Fprintf(w, "- %s (%s) NEEDS_APPROVAL — %s\n", b.Capability, b.Adapter, b.Reason)
+	}
+	for _, b := range result.Blocked {
+		fmt.Fprintf(w, "- %s (%s) BLOCKED — %s\n", b.Capability, b.Adapter, b.Reason)
 	}
 }
 
@@ -237,6 +289,12 @@ func buildContextBundle(role, planDir, request string) (string, error) {
 		for i, s := range sel.Skills {
 			fmt.Fprintf(&manifest, "  - %s: %q\n", s.Name, sel.Explanations[i].Reason)
 		}
+		toolResult := routeTools(repoRoot, role, request, meta.ApprovedAt != "")
+		writeToolSelection(&out, toolResult)
+		fmt.Fprintf(&manifest, "tools:\n")
+		for _, s := range toolResult.Allowed {
+			fmt.Fprintf(&manifest, "  - %s: allowed\n", s.Capability)
+		}
 
 	case "plan-reviewer":
 		fmt.Fprintf(&out, "## Plan\nrisk_level: %s\nrequires_approval: %v\n\n", meta.RiskLevel, meta.RequiresApproval)
@@ -266,6 +324,12 @@ func buildContextBundle(role, planDir, request string) (string, error) {
 		fmt.Fprintf(&manifest, "skills:\n")
 		for i, s := range sel.Skills {
 			fmt.Fprintf(&manifest, "  - %s: %q\n", s.Name, sel.Explanations[i].Reason)
+		}
+		toolResult := routeTools(repoRoot, role, request, meta.ApprovedAt != "")
+		writeToolSelection(&out, toolResult)
+		fmt.Fprintf(&manifest, "tools:\n")
+		for _, s := range toolResult.Allowed {
+			fmt.Fprintf(&manifest, "  - %s: allowed\n", s.Capability)
 		}
 
 	case "verifier":

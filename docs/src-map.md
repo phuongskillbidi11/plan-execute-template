@@ -208,3 +208,41 @@ from a directory that itself contained `plan.yaml`; omitting the argument defaul
 identical to every existing invocation.
 
 From: `.plans/2026-08-25-v2-harness-phase6-skills/`
+
+### `cli/internal/toolcap/`, `cli/internal/tooladapter/`, `cli/internal/toolpolicy/`, `cli/internal/toolrouter/`, `cli/internal/mcpregistry/` — Phase 7 tool adapter runtime
+
+What it does: `toolcap` defines the capability/risk model (`READ < WRITE < DESTRUCTIVE <
+HIGH_RISK`). `tooladapter`'s `Adapter` interface (revised from Phase 5's foundation-only
+shape) is implemented by `GitAdapter` (upgraded), the new external reference
+`GitHubAdapter` (read-only, via `gh`), and `ReferenceMCPAdapter` (deterministic mock MCP
+server — no live transport). `toolpolicy.Decide` is the one policy function: built-in
+hard deny, then project `tools.deny`/role toolbox/role risk ceiling/`tools.require_approval`
+(gated on `plan.yaml`'s existing execution-approval field, not a new approval concept)/
+`tools.allow`, then a safe risk-based default. `toolrouter.Route` (the new authoritative
+path; `Filter` stays as Phase 5's simpler adapter-name filter) buckets each required
+capability into Allowed/NeedsApproval/Blocked with a reason. `mcpregistry` loads
+`harness/mcp/servers.yaml`, a static, credential-free discovery list. `eng tools invoke`
+is the one invocation boundary — it always runs `toolpolicy.Decide` first, writes a
+compact `tool_invocation` audit event via the existing `planmeta.AppendStructuredEvent`
+(Phase 5) regardless of outcome, and reuses Phase 4/5's `writeFullLog`/`summarizeOutput`
+for bounded output. `buildContextBundle`'s Planner/Executor sections gain a `## Tools`
+section driven by the selected skills' `capabilities:` field (Phase 6) — the Requirement
+28 connection from Skill Router to Tool Router, with no separate NL-capability-detection
+logic.
+
+Key files: `cli/internal/toolpolicy/toolpolicy.go` (`Decide`), `cli/internal/toolrouter/toolrouter.go`
+(`Route`), `cli/internal/tooladapter/{tooladapter,github,reference_mcp}.go`
+
+Notable: `Config.RequireApproval` (a pre-existing, never-read, undocumented field) was
+deliberately *not* repurposed for the new `tools.require_approval` policy — a new, nested
+`Config.Tools` field was added instead, since guessing at the old field's original intent
+was a bigger risk than adding a clearly-scoped one. A project with no `tools:` block at
+all (every project before this phase) gets exactly today's behavior: read capabilities
+work, write-ish ones require the same plan approval Phase 3 already established. A real
+defect was found and fixed during this plan's own execution: `ReferenceMCPAdapter` (Name()
+`"mcp-docs"`) was implemented and wired into routing, but never added to
+`agent.RolePermissions` — every role's toolbox check silently denied it regardless of
+availability or policy, caught via a live `eng capabilities explain` walkthrough and now
+covered by a regression test.
+
+From: `.plans/2026-08-25-v2-harness-phase7-tools/`

@@ -742,6 +742,19 @@ cd cli && go build -o eng .
 See `docs/skills.md` for the full skill model and `.plans/2026-08-25-v2-harness-phase6-skills/spec.md`
 for the full design.
 
+Phase 7 turns the tool-adapter foundation into an enforced runtime — capabilities are
+risk-classified, role permission is checked (not just reported), and every invocation is
+audited:
+
+```bash
+cd cli && go build -o eng .
+./eng capabilities explain executor .plans/2026-08-25-my-feature "inspect open pull requests"
+./eng tools invoke executor git.status .plans/2026-08-25-my-feature
+```
+
+See `docs/tools.md` for the full adapter/capability/policy model and
+`.plans/2026-08-25-v2-harness-phase7-tools/spec.md` for the full design.
+
 ---
 
 ## Contributing

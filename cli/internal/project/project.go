@@ -8,6 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"eng/internal/executil"
+	"eng/internal/toolpolicy"
 )
 
 type Stack struct {
@@ -93,6 +94,12 @@ type Config struct {
 	// project.yaml) skips the private tier entirely — see Phase 6 spec.md
 	// Decision 8.
 	PrivateSkillsPath string `yaml:"private_skills_path,omitempty"`
+
+	// Tools is the Phase 7 project-level tool policy (allow/require_approval/
+	// deny, by capability name). Deliberately not a reuse of the
+	// pre-existing, unread RequireApproval field above — see Phase 7
+	// spec.md Decision 2.
+	Tools toolpolicy.Policy `yaml:"tools,omitempty"`
 }
 
 // EffectiveWorkflow returns the configured Workflow, or all-enabled if this

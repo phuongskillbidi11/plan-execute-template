@@ -1,0 +1,10 @@
+servers:
+  - name: docs-search
+    transport: mock
+    capabilities: [docs.search]
+    permission_category: read
+    description: >
+      Deterministic local reference adapter — searches this repo's docs/*.md files.
+      Proves the MCP-style adapter lifecycle (discovery, health, capability declaration,
+      routing, permission, invocation, audit) without a live MCP server or network
+      dependency. See docs/tools.md.

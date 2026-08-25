@@ -42,6 +42,8 @@ func main() {
 		cmdContext(os.Args[2:])
 	case "logs":
 		cmdLogs(os.Args[2:])
+	case "tools":
+		cmdTools(os.Args[2:])
 	default:
 		usage()
 		os.Exit(1)
@@ -69,6 +71,8 @@ Commands:
   workflow advance [dir]             Mechanically apply the next safe transition
   adapter prompt <role> <dir>        Print the assembled prompt for an agent session
   capabilities list                  Report which known tools are on PATH
+  capabilities explain <role> <plan-dir> ["<text>"]   Explain tool routing for a request
+  tools invoke <role> <capability> <plan-dir> [args...]   Invoke one capability, audited
   start                              Run doctor, then launch the configured agent
   context skills "<text>"            Show the skills selected for a request
   context project "<text>"           Show matching docs/src-map.md and docs/gotchas.md sections
