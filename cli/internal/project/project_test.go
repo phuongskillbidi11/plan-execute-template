@@ -142,3 +142,33 @@ func TestLegacyProjectYAMLWithoutPlanningModeStillLoads(t *testing.T) {
 		t.Fatalf("expected a pre-Phase-5 project.yaml to resolve to auto_plan, got %q", cfg.Workflow.PlanningModeOrDefault())
 	}
 }
+
+func TestDomainsAndPrivateSkillsPathDefaultToEmpty(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{ProjectName: "x", Mode: "modern"}
+	if err := Save(dir, cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Domains) != 0 || got.PrivateSkillsPath != "" {
+		t.Fatalf("expected both to default to empty, got %+v", got)
+	}
+}
+
+func TestDomainsAndPrivateSkillsPathRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{ProjectName: "x", Mode: "modern", Domains: []string{"embedded", "automation"}, PrivateSkillsPath: "../company-skills"}
+	if err := Save(dir, cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Domains) != 2 || got.Domains[0] != "embedded" || got.Domains[1] != "automation" || got.PrivateSkillsPath != "../company-skills" {
+		t.Fatalf("round-trip mismatch: %+v", got)
+	}
+}

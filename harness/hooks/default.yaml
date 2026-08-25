@@ -15,8 +15,8 @@ on_failure:
 commands:
   project_scan: "eng scan"
   plan_review: ""              # performed by the Plan Reviewer role, not a shell command
-  drift_check: "eng plan drift ."
+  drift_check: "eng plan drift ${plan_dir}"
   test: "${test_cmd}"
   regression_test: "${test_cmd}"
-  verify: "eng verify ."
+  verify: "eng verify ${plan_dir}"
   collect_logs: ""             # performed by the Executor writing errors.log, not a shell command

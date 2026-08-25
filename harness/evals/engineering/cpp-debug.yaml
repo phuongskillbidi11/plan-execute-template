@@ -1,0 +1,5 @@
+name: cpp-debug
+request: "Debug a C++ build issue"
+expected_skills:
+  - debugging
+  - cpp

@@ -13,10 +13,14 @@ import (
 
 func cmdHooks(args []string) {
 	if len(args) < 2 || args[0] != "run" {
-		fmt.Println("Usage: eng hooks run <stage>")
+		fmt.Println("Usage: eng hooks run <stage> [plan-dir]")
 		os.Exit(1)
 	}
 	stage := args[1]
+	planDir := "."
+	if len(args) > 2 {
+		planDir = args[2]
+	}
 
 	dir, err := os.Getwd()
 	if err != nil {
@@ -50,6 +54,7 @@ func cmdHooks(args []string) {
 		}
 		if cmd.Shell != "" {
 			cmd.Shell = strings.ReplaceAll(cmd.Shell, "${test_cmd}", testCmd)
+			cmd.Shell = strings.ReplaceAll(cmd.Shell, "${plan_dir}", planDir)
 		}
 		fmt.Printf("[%s] %-16s -> %s\n", stage, name, cmd.String())
 		out, err := executil.Run(cmd, dir)

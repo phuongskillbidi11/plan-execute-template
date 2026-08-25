@@ -8,7 +8,7 @@ import (
 
 	"eng/internal/capabilities"
 	"eng/internal/project"
-	"eng/internal/skills"
+	"eng/internal/skillvalidate"
 )
 
 func cmdDoctor(args []string) {
@@ -45,12 +45,20 @@ func cmdDoctor(args []string) {
 		fmt.Printf("Detected stack:    %s\n", cfg.Stack.Type)
 	}
 
-	resolved, err := skills.Resolve(filepath.Join(hDir, "skills"), filepath.Join(dir, "skills"))
+	report, err := skillvalidate.Validate(filepath.Join(hDir, "skills"), privateSkillsRoot(dir), filepath.Join(dir, "skills"))
 	if err == nil {
-		fmt.Printf("Skills resolved:   %d\n", len(resolved))
-		for _, s := range resolved {
-			fmt.Printf("  - %-30s [%s] %s\n", s.Name, s.Source, s.Description)
+		broken := 0
+		for _, issue := range report.Errors() {
+			if strings.Contains(issue.Message, "cycle") || strings.Contains(issue.Message, "requires unknown") {
+				broken++
+			}
 		}
+		fmt.Println("\nSkills:")
+		fmt.Printf("  %d discovered\n", report.Discovered)
+		fmt.Printf("  %d valid\n", report.Discovered-len(issuedSkillNames(report.Issues)))
+		fmt.Printf("  %d warning(s)\n", len(report.Warnings()))
+		fmt.Printf("  %d broken dependency issue(s)\n", broken)
+		fmt.Println("  (run `eng skills list` or `eng skills validate` for detail)")
 	}
 
 	fmt.Println("\nCapabilities:")
@@ -61,4 +69,17 @@ func cmdDoctor(args []string) {
 		}
 		fmt.Printf("  %-10s %s\n", name, status)
 	}
+}
+
+// issuedSkillNames counts distinct skills with at least one issue, so
+// doctor's "valid" count doesn't double-subtract a skill with two
+// warnings.
+func issuedSkillNames(issues []skillvalidate.Issue) map[string]bool {
+	out := map[string]bool{}
+	for _, i := range issues {
+		if i.Skill != "(graph)" {
+			out[i.Skill] = true
+		}
+	}
+	return out
 }

@@ -12,7 +12,7 @@ import (
 	"eng/internal/docsearch"
 	"eng/internal/planmeta"
 	"eng/internal/project"
-	"eng/internal/skillmatch"
+	"eng/internal/skillrouter"
 	"eng/internal/skills"
 	"eng/internal/taskscope"
 )
@@ -48,31 +48,57 @@ func loadContextConfig(dir string) contextcfg.Config {
 	return cfg
 }
 
+// privateSkillsRoot resolves .agent/project.yaml's optional
+// private_skills_path relative to dir, or "" if unset/unreadable — "" means
+// skip the private tier entirely (Phase 6 spec.md Decision 8).
+func privateSkillsRoot(dir string) string {
+	cfg, err := project.Load(dir)
+	if err != nil || cfg.PrivateSkillsPath == "" {
+		return ""
+	}
+	if filepath.IsAbs(cfg.PrivateSkillsPath) {
+		return cfg.PrivateSkillsPath
+	}
+	return filepath.Join(dir, cfg.PrivateSkillsPath)
+}
+
 // selectSkills is the pure core behind `eng context skills`, reused by
 // buildContextBundle so the manifest can record exactly what was chosen.
-func selectSkills(dir, request string, cfg contextcfg.Config) (selected []skills.Skill, total int, err error) {
-	all, err := skills.Resolve(filepath.Join(harnessDir(), "skills"), filepath.Join(dir, "skills"))
+// It is the one authoritative skill-selection path (Phase 6 Requirement
+// 19) — all routing (dependency expansion, domain-profile fills,
+// recommends, budget) happens inside skillrouter.Route.
+func selectSkills(dir, request string, cfg contextcfg.Config) (skillrouter.Selection, int, error) {
+	all, err := skills.ResolveWithPrivate(filepath.Join(harnessDir(), "skills"), privateSkillsRoot(dir), filepath.Join(dir, "skills"))
 	if err != nil {
-		return nil, 0, err
+		return skillrouter.Selection{}, 0, err
 	}
-	var mustInclude []string
+	var mustInclude, domains []string
 	if pcfg, err := project.Load(dir); err == nil {
 		mustInclude = pcfg.EnabledSkills
+		domains = pcfg.Domains
 	}
 	maxSkills := cfg.MaxSkills
 	if cfg.Strategy == "full" {
 		maxSkills = 0
 	}
-	return skillmatch.Select(all, request, mustInclude, maxSkills), len(all), nil
+	sel, err := skillrouter.Route(all, request, mustInclude, domains, maxSkills)
+	if err != nil {
+		return skillrouter.Selection{}, 0, err
+	}
+	return sel, len(all), nil
 }
 
-func writeSkillSelection(w io.Writer, selected []skills.Skill, total int, cfg contextcfg.Config) {
-	fmt.Fprintf(w, "Selected %d/%d skills (strategy: %s, max_skills: %d)\n\n", len(selected), total, cfg.Strategy, cfg.MaxSkills)
-	for _, s := range selected {
-		fmt.Fprintf(w, "- %-30s [%s] %s\n", s.Name, s.Domain, s.Description)
+func writeSkillSelection(w io.Writer, sel skillrouter.Selection, total int, cfg contextcfg.Config) {
+	fmt.Fprintf(w, "Selected %d/%d skills (strategy: %s, max_skills: %d)\n\n", len(sel.Skills), total, cfg.Strategy, cfg.MaxSkills)
+	for i, s := range sel.Skills {
+		reason := ""
+		if i < len(sel.Explanations) {
+			reason = sel.Explanations[i].Reason
+		}
+		fmt.Fprintf(w, "- %-30s [%s] %s\n    selected because %s\n", s.Name, s.Domain, s.Description, reason)
 	}
-	if len(selected) < total {
-		fmt.Fprintf(w, "\n%d skill(s) omitted as not relevant to this request.\n", total-len(selected))
+	if len(sel.Skills) < total {
+		fmt.Fprintf(w, "\n%d skill(s) omitted as not relevant to this request.\n", total-len(sel.Skills))
 	}
 }
 
@@ -84,12 +110,12 @@ func contextSkills(args []string) {
 	request := strings.Join(args, " ")
 	dir, _ := os.Getwd()
 	cfg := loadContextConfig(dir)
-	selected, total, err := selectSkills(dir, request, cfg)
+	sel, total, err := selectSkills(dir, request, cfg)
 	if err != nil {
 		fmt.Println("error:", err)
 		os.Exit(1)
 	}
-	writeSkillSelection(os.Stdout, selected, total, cfg)
+	writeSkillSelection(os.Stdout, sel, total, cfg)
 }
 
 // selectProjectContext is the pure core behind `eng context project`.
@@ -188,12 +214,12 @@ func buildContextBundle(role, planDir, request string) (string, error) {
 	switch role {
 	case "planner":
 		byFile := selectProjectContext(repoRoot, request, cfg)
-		selected, total, _ := selectSkills(repoRoot, request, cfg)
-		if allSectionsEmpty(byFile) && len(selected) == 0 && cfg.Strategy != "full" {
+		sel, total, _ := selectSkills(repoRoot, request, cfg)
+		if allSectionsEmpty(byFile) && len(sel.Skills) == 0 && cfg.Strategy != "full" {
 			fbCfg := cfg
 			fbCfg.Strategy = "full"
 			byFile = selectProjectContext(repoRoot, request, fbCfg)
-			selected, total, _ = selectSkills(repoRoot, request, fbCfg)
+			sel, total, _ = selectSkills(repoRoot, request, fbCfg)
 			fmt.Fprintf(&manifest, "fallback_to_full: true\n")
 			fmt.Fprintf(&out, "(no matches under 'selective' strategy — fell back to 'full' for this call)\n\n")
 		}
@@ -206,10 +232,10 @@ func buildContextBundle(role, planDir, request string) (string, error) {
 			}
 		}
 		fmt.Fprintf(&out, "## Skills\n")
-		writeSkillSelection(&out, selected, total, cfg)
+		writeSkillSelection(&out, sel, total, cfg)
 		fmt.Fprintf(&manifest, "skills:\n")
-		for _, s := range selected {
-			fmt.Fprintf(&manifest, "  - %s\n", s.Name)
+		for i, s := range sel.Skills {
+			fmt.Fprintf(&manifest, "  - %s: %q\n", s.Name, sel.Explanations[i].Reason)
 		}
 
 	case "plan-reviewer":
@@ -234,12 +260,12 @@ func buildContextBundle(role, planDir, request string) (string, error) {
 			fmt.Fprintf(&out, "%s\n", task)
 		}
 		fmt.Fprintf(&manifest, "current_task_present: %v\n", task != "")
-		selected, total, _ := selectSkills(repoRoot, request, cfg)
+		sel, total, _ := selectSkills(repoRoot, request, cfg)
 		fmt.Fprintf(&out, "\n## Skills\n")
-		writeSkillSelection(&out, selected, total, cfg)
+		writeSkillSelection(&out, sel, total, cfg)
 		fmt.Fprintf(&manifest, "skills:\n")
-		for _, s := range selected {
-			fmt.Fprintf(&manifest, "  - %s\n", s.Name)
+		for i, s := range sel.Skills {
+			fmt.Fprintf(&manifest, "  - %s: %q\n", s.Name, sel.Explanations[i].Reason)
 		}
 
 	case "verifier":

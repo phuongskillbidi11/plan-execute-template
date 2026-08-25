@@ -16,12 +16,29 @@ type Skill struct {
 	Tags         []string `yaml:"tags"`
 	Triggers     []string `yaml:"triggers"`
 	Version      string   `yaml:"version"`
-	Dependencies []string `yaml:"dependencies"`
+	Level        string   `yaml:"level"` // "" | engineering | domain | technology
+	Requires     []string `yaml:"requires"`
+	Recommends   []string `yaml:"recommends"`
+	Capabilities []string `yaml:"capabilities"`
 	Conflicts    []string `yaml:"conflicts"`
 	WhenToUse    string   `yaml:"when_to_use"`
 	WhenNotToUse string   `yaml:"when_not_to_use"`
-	Source       string   `yaml:"-"` // "global" or "local", set by Resolve
+	Source       string   `yaml:"-"` // "global", "private", or "local" — set by Resolve
 	Path         string   `yaml:"-"`
+}
+
+// QualifiedName is a skill's identity for merge/collision purposes:
+// domain-qualified when Domain is set and Name doesn't already contain a
+// "/", unchanged otherwise. This covers both a self-namespaced
+// "company/internal-api"-style name and every legacy skill (Domain is the
+// literal "unknown" from parseLegacy) — legacy skills keep
+// merging/overriding by bare Name exactly as before Phase 6. See Phase 6
+// spec.md Decision 3.
+func (s Skill) QualifiedName() string {
+	if s.Domain == "" || s.Domain == "unknown" || strings.Contains(s.Name, "/") {
+		return s.Name
+	}
+	return s.Domain + "/" + s.Name
 }
 
 // ParseSkillFile reads one SKILL.md. It prefers YAML frontmatter; if none is
@@ -87,31 +104,42 @@ func Walk(root string) ([]Skill, error) {
 	return out, err
 }
 
-// Resolve merges global and project-local skills by name; local overrides
-// global on a name collision.
+// Resolve merges global and project-local skills by QualifiedName; local
+// overrides global on a collision. Equivalent to
+// ResolveWithPrivate(globalRoot, "", localRoot) — kept as its own function
+// since it's the exact two-tier shape every pre-Phase-6 caller and test
+// expects.
 func Resolve(globalRoot, localRoot string) ([]Skill, error) {
-	global, err := Walk(globalRoot)
-	if err != nil {
-		return nil, err
-	}
-	for i := range global {
-		global[i].Source = "global"
-	}
+	return ResolveWithPrivate(globalRoot, "", localRoot)
+}
 
-	local, err := Walk(localRoot)
-	if err != nil {
-		return nil, err
-	}
-	for i := range local {
-		local[i].Source = "local"
-	}
-
+// ResolveWithPrivate merges up to three tiers by QualifiedName, in
+// increasing precedence: global < private < local. An empty privateRoot
+// skips that tier entirely (see Phase 6 spec.md Decision 3 for why there
+// are three tiers, not the four the instruction first proposed).
+func ResolveWithPrivate(globalRoot, privateRoot, localRoot string) ([]Skill, error) {
 	merged := map[string]Skill{}
-	for _, s := range global {
-		merged[s.Name] = s
+
+	tiers := []struct {
+		root   string
+		source string
+	}{
+		{globalRoot, "global"},
+		{privateRoot, "private"},
+		{localRoot, "local"},
 	}
-	for _, s := range local {
-		merged[s.Name] = s
+	for _, t := range tiers {
+		if t.root == "" {
+			continue
+		}
+		found, err := Walk(t.root)
+		if err != nil {
+			return nil, err
+		}
+		for _, s := range found {
+			s.Source = t.source
+			merged[s.QualifiedName()] = s
+		}
 	}
 
 	out := make([]Skill, 0, len(merged))

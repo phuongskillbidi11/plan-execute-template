@@ -60,3 +60,65 @@ func TestResolveMissingRoots(t *testing.T) {
 		t.Fatalf("expected empty, no error; got %+v, %v", merged, err)
 	}
 }
+
+func TestQualifiedNameLegacySkillStaysBareName(t *testing.T) {
+	s := Skill{Name: "example", Domain: "unknown"}
+	if s.QualifiedName() != "example" {
+		t.Fatalf("expected legacy skill to keep bare name, got %q", s.QualifiedName())
+	}
+}
+
+func TestQualifiedNameSelfNamespacedNameUnchanged(t *testing.T) {
+	s := Skill{Name: "company/internal-api", Domain: "company"}
+	if s.QualifiedName() != "company/internal-api" {
+		t.Fatalf("expected self-namespaced name unchanged, got %q", s.QualifiedName())
+	}
+}
+
+func TestResolveQualifiesByDomainToAvoidCollisions(t *testing.T) {
+	root := t.TempDir()
+	writeSkill(t, filepath.Join(root, "automation"), "modbus", "---\nname: modbus\ndomain: automation\ndescription: automation modbus\n---\n")
+	writeSkill(t, filepath.Join(root, "networking"), "modbus", "---\nname: modbus\ndomain: networking\ndescription: networking modbus\n---\n")
+	merged, err := Resolve(root, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(merged) != 2 {
+		t.Fatalf("expected 2 distinct skills (domain-qualified), got %d: %+v", len(merged), merged)
+	}
+}
+
+func TestResolveWithPrivateEmptyRootSkipsTier(t *testing.T) {
+	g, l := t.TempDir(), t.TempDir()
+	writeSkill(t, g, "only-global", "---\nname: only-global\ndescription: g\n---\n")
+	merged, err := ResolveWithPrivate(g, "", l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(merged) != 1 {
+		t.Fatalf("expected 1 skill, got %d", len(merged))
+	}
+}
+
+func TestResolveWithPrivatePrecedenceGlobalLtPrivateLtLocal(t *testing.T) {
+	g, p, l := t.TempDir(), t.TempDir(), t.TempDir()
+	writeSkill(t, g, "shared", "---\nname: shared\ndescription: global\n---\n")
+	writeSkill(t, p, "shared", "---\nname: shared\ndescription: private\n---\n")
+
+	merged, err := ResolveWithPrivate(g, p, l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(merged) != 1 || merged[0].Description != "private" {
+		t.Fatalf("expected private to override global, got %+v", merged)
+	}
+
+	writeSkill(t, l, "shared", "---\nname: shared\ndescription: local\n---\n")
+	merged, err = ResolveWithPrivate(g, p, l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(merged) != 1 || merged[0].Description != "local" {
+		t.Fatalf("expected local to override private, got %+v", merged)
+	}
+}

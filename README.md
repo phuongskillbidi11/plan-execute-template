@@ -730,6 +730,18 @@ fully available for debugging, CI, and advanced manual workflows.
 
 See `.plans/2026-08-24-v2-harness-phase5-runtime/spec.md` for the full design.
 
+Phase 6 turns the single flat skill list into a three-level, multi-domain, dependency-aware
+ecosystem:
+
+```bash
+cd cli && go build -o eng .
+./eng context skills "ESP32 reads Siemens S7-1200 over Modbus TCP"
+./eng skills validate
+```
+
+See `docs/skills.md` for the full skill model and `.plans/2026-08-25-v2-harness-phase6-skills/spec.md`
+for the full design.
+
 ---
 
 ## Contributing

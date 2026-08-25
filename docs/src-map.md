@@ -180,3 +180,31 @@ review/approval by design — `eng plan escalate` is the correction mechanism if
 turns out to be broader than triage guessed.
 
 From: `.plans/2026-08-24-v2-harness-phase5-runtime/`
+
+### `cli/internal/skillgraph/`, `cli/internal/skillrouter/`, `cli/internal/skillvalidate/`, `cli/internal/skilleval/` — Phase 6 multi-domain skill ecosystem
+
+What it does: `skillgraph` expands a skill's `requires:` transitively (deterministic order,
+cycle detection, unknown-target errors). `skillrouter.Route` is the one authoritative
+selection path `context_cmd.go`'s `selectSkills` calls — explicit skills, then their
+required dependencies, then request matches, then a project's `domains:` profile fill,
+then `recommends:`, all budget-aware, each with an explanation. `skillvalidate` checks
+metadata/dependency issues (`eng skills validate`), warning-only for legacy skills.
+`skilleval` loads `harness/evals/**/*.yaml` scenarios exercised by a `cli/` integration
+test against the real `harness/skills` tree. `skills.Skill` gained `level`, `requires`
+(renamed from the unused `dependencies`), `recommends`, `capabilities`, and a
+`QualifiedName()` identity (`domain/name`) that `Resolve`/the new `ResolveWithPrivate`
+merge by instead of bare name, preventing cross-domain collisions. `project.Config` gained
+`domains` (plural, combinable domain profile) and `private_skills_path` (a third,
+optional resolution tier between global and project-local).
+
+Key files: `cli/internal/skillrouter/skillrouter.go`, `cli/internal/skills/skills.go`
+(`QualifiedName`, `ResolveWithPrivate`), `docs/skills.md` (the authoring/routing guide)
+
+Notable: `Resolve(global, local)` is now `ResolveWithPrivate(global, "", local)` — a pure
+delegation, byte-identical behavior, covered by a regression test — so no pre-Phase-6
+caller needed to change. `eng hooks run <stage> [plan-dir]` gained an optional third
+argument fixing the Phase 5 gotcha where `drift_check`/`verify` only worked when invoked
+from a directory that itself contained `plan.yaml`; omitting the argument defaults to `.`,
+identical to every existing invocation.
+
+From: `.plans/2026-08-25-v2-harness-phase6-skills/`

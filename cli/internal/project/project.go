@@ -80,6 +80,19 @@ type Config struct {
 	Workflow        Workflow    `yaml:"workflow,omitempty"`
 	RetryBudget     RetryBudget `yaml:"retry_budget,omitempty"`
 	RequireApproval []string    `yaml:"require_approval,omitempty"`
+
+	// Domains is the Phase 6 domain-profile list (e.g. ["embedded",
+	// "automation"]) used by the skill router's domain-profile fill tier.
+	// Deliberately separate from HarnessProfile (a singular, unused-since-
+	// eng-init field from V1) — see Phase 6 spec.md Decision 7.
+	Domains []string `yaml:"domains,omitempty"`
+
+	// PrivateSkillsPath, if set, is resolved relative to the project root
+	// (or used as-is if absolute) as an extra skill root between global and
+	// local precedence. Empty (the default for every existing
+	// project.yaml) skips the private tier entirely — see Phase 6 spec.md
+	// Decision 8.
+	PrivateSkillsPath string `yaml:"private_skills_path,omitempty"`
 }
 
 // EffectiveWorkflow returns the configured Workflow, or all-enabled if this

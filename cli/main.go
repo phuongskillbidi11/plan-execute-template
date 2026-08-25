@@ -56,7 +56,8 @@ Commands:
   init                    Initialize the current directory as a harness-aware project
   doctor                  Report harness install status, project mode, and resolved skills
   scan                    Print detected stack and a file summary
-  skills list             List resolved skills (global + project-local)
+  skills list             List resolved skills (global + private + project-local)
+  skills validate         Check skill metadata/dependencies for issues (exit 1 on errors)
   plan new <name> [--risk <level>]   Scaffold a plan and stamp it with the current git SHA
   plan drift [dir]                   Check whether relevant files changed since planning
   plan retry <dir> <stage>           Track a retry against this plan's budget

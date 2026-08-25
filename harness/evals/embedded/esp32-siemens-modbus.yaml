@@ -1,0 +1,12 @@
+name: esp32-siemens-modbus
+request: "ESP32 reads Siemens S7-1200 over Modbus TCP"
+expected_skills:
+  - esp32
+  - siemens-s7
+  - plc
+  - modbus
+  - tcp-ip
+notes: >
+  The headline example from the Phase 6 instruction. plc is pulled in only via
+  siemens-s7's requires:; tcp-ip is matched both directly (the request text contains
+  "TCP") and via modbus's recommends: — either path is sufficient.

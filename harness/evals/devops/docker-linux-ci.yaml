@@ -1,0 +1,5 @@
+name: docker-linux-ci
+request: "Set up Docker on Linux for CI"
+expected_skills:
+  - docker
+  - linux
