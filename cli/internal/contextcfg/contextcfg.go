@@ -16,6 +16,10 @@ type Config struct {
 	MaxLogLines           int
 	IncludeCompletedTasks bool
 	SummarizeToolOutput   bool
+
+	MaxLogFiles   int // .agent/logs/ retention — see internal/logprune
+	MaxLogAgeDays int
+	MaxLogTotalMB int
 }
 
 // override mirrors Config but with pointer fields, so YAML unmarshal can
@@ -30,6 +34,10 @@ type override struct {
 	MaxLogLines           *int    `yaml:"max_log_lines"`
 	IncludeCompletedTasks *bool   `yaml:"include_completed_tasks"`
 	SummarizeToolOutput   *bool   `yaml:"summarize_tool_output"`
+
+	MaxLogFiles   *int `yaml:"max_log_files"`
+	MaxLogAgeDays *int `yaml:"max_log_age_days"`
+	MaxLogTotalMB *int `yaml:"max_log_total_mb"`
 }
 
 func Default() Config {
@@ -40,6 +48,9 @@ func Default() Config {
 		MaxLogLines:           300,
 		IncludeCompletedTasks: false,
 		SummarizeToolOutput:   true,
+		MaxLogFiles:           100,
+		MaxLogAgeDays:         30,
+		MaxLogTotalMB:         250,
 	}
 }
 
@@ -84,6 +95,15 @@ func Load(projectDir, globalDefaultPath string) (Config, error) {
 	}
 	if o.SummarizeToolOutput != nil {
 		cfg.SummarizeToolOutput = *o.SummarizeToolOutput
+	}
+	if o.MaxLogFiles != nil {
+		cfg.MaxLogFiles = *o.MaxLogFiles
+	}
+	if o.MaxLogAgeDays != nil {
+		cfg.MaxLogAgeDays = *o.MaxLogAgeDays
+	}
+	if o.MaxLogTotalMB != nil {
+		cfg.MaxLogTotalMB = *o.MaxLogTotalMB
 	}
 	return cfg, nil
 }

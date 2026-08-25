@@ -158,3 +158,25 @@ reads `plan.yaml`'s `verification.verdict`, not the report text.
 From: `.plans/2026-08-24-v2-harness-phase4-context/`
 
 From: `.plans/2026-08-24-v2-harness-phase3/`
+
+### `harness/core/runtime/`, Phase 5 workflow/context/log extensions — runtime integration
+
+What it does: `harness/core/runtime/METHOD.md` is the natural-language routing protocol a
+Claude Code session follows for a plain-language request. `eng adapter prompt` now folds in
+`eng context bundle`'s output automatically. `internal/workflow` gained `NEEDS_SPEC_APPROVAL`/
+`SPEC_APPROVED` (a distinct concept from the existing execution-approval gate) and a
+quick-fix fast path that skips straight from `TRIAGED` to `EXECUTING` with a minimal plan.
+`internal/logprune` bounds `.agent/logs/` growth. `internal/tooladapter`/`internal/toolrouter`
+are new, deliberately unpopulated foundations for future external-tool adapters, kept
+structurally separate from `internal/agent`'s coding-agent adapters.
+
+Key files: `harness/core/runtime/METHOD.md`, `cli/context_cmd.go` (`buildContextBundle`),
+`cli/internal/workflow/workflow.go` (the extended transition table)
+
+Notable: `planning_mode` defaults to `auto_plan` (Phase 1-4's exact behavior) whenever it is
+unset — only a project initialized by Phase 5's `eng init` gets `spec_first` explicitly; no
+existing project's state-machine behavior changes. Quick Fix's fast path deliberately skips
+review/approval by design — `eng plan escalate` is the correction mechanism if a request
+turns out to be broader than triage guessed.
+
+From: `.plans/2026-08-24-v2-harness-phase5-runtime/`

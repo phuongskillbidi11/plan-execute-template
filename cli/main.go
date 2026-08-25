@@ -40,6 +40,8 @@ func main() {
 		cmdStart(os.Args[2:])
 	case "context":
 		cmdContext(os.Args[2:])
+	case "logs":
+		cmdLogs(os.Args[2:])
 	default:
 		usage()
 		os.Exit(1)
@@ -70,5 +72,7 @@ Commands:
   context skills "<text>"            Show the skills selected for a request
   context project "<text>"           Show matching docs/src-map.md and docs/gotchas.md sections
   context task <plan-dir>            Show the current task and goal summary
-  context bundle <role> <plan-dir>   Compose role-specific context and write a manifest`)
+  context bundle <role> <plan-dir>   Compose role-specific context and write a manifest
+  context manifest <plan-dir>        Pretty-print an existing context-manifest.yaml
+  logs prune [--dry-run]             Apply .agent/logs/ retention (max_files/age/total size)`)
 }

@@ -715,6 +715,21 @@ cd cli && go build -o eng .
 
 See `.plans/2026-08-24-v2-harness-phase4-context/spec.md` for the full design.
 
+Phase 5 wires the pieces above into a natural-language-first default experience:
+
+```bash
+cd cli && go build -o eng .
+cd /path/to/any/project
+eng start   # doctor + a pointer to the runtime routing method, then launches your agent
+# inside that session, just describe the requirement — see
+# ~/.engineering-harness/core/runtime/METHOD.md for the exact command sequence it follows.
+```
+
+Low-level commands (`eng plan new`, `eng workflow advance`, `eng context bundle`, ...) remain
+fully available for debugging, CI, and advanced manual workflows.
+
+See `.plans/2026-08-24-v2-harness-phase5-runtime/spec.md` for the full design.
+
 ---
 
 ## Contributing

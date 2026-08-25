@@ -59,3 +59,10 @@ func TestExplicitFalseIsRespected(t *testing.T) {
 		t.Fatal("expected SummarizeToolOutput to be explicitly false")
 	}
 }
+
+func TestLogRetentionDefaults(t *testing.T) {
+	cfg := Default()
+	if cfg.MaxLogFiles != 100 || cfg.MaxLogAgeDays != 30 || cfg.MaxLogTotalMB != 250 {
+		t.Fatalf("unexpected log retention defaults: %+v", cfg)
+	}
+}

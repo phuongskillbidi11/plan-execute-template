@@ -51,6 +51,12 @@ type Meta struct {
 	ApprovedBy       string       `yaml:"approved_by,omitempty"`
 	Review           Review       `yaml:"review,omitempty"`
 	Verification     Verification `yaml:"verification,omitempty"`
+
+	// SpecApprovedAt/By are entirely separate from ApprovedAt/By above:
+	// this pair means "the requirements in spec.md are approved," never
+	// "this risky execution may proceed" — see Phase 5 spec.md Decision 5.
+	SpecApprovedAt string `yaml:"spec_approved_at,omitempty"`
+	SpecApprovedBy string `yaml:"spec_approved_by,omitempty"`
 }
 
 const FileName = "plan.yaml"
@@ -122,5 +128,31 @@ func AppendEvent(planDir, eventType, detail string) error {
 		return err
 	}
 	_, err = f.Write(append(data, '\n'))
+	return err
+}
+
+// AppendStructuredEvent records one line to events.jsonl with an arbitrary
+// flat payload merged with {type, at} — used for compact records like the
+// Quick Fix completion event, which needs more than AppendEvent's single
+// "detail" string.
+func AppendStructuredEvent(planDir, eventType string, data map[string]interface{}) error {
+	f, err := os.OpenFile(filepath.Join(planDir, EventsFileName), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	payload := map[string]interface{}{
+		"type": eventType,
+		"at":   time.Now().UTC().Format(time.RFC3339),
+	}
+	for k, v := range data {
+		payload[k] = v
+	}
+	line, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(append(line, '\n'))
 	return err
 }

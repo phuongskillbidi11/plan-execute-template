@@ -197,8 +197,12 @@ func gatherFacts(planDir string, meta *planmeta.Meta) (workflow.Facts, error) {
 	}
 
 	reviewRequired := meta.RiskLevel == "architecture" || meta.RiskLevel == "high-risk"
+	planningMode := "auto_plan"
+	requireSpecApproval := true
 	if cfg, err := project.Load(repoRoot); err == nil {
 		reviewRequired = reviewRequired || cfg.EffectiveWorkflow().PlanReview
+		planningMode = cfg.Workflow.PlanningModeOrDefault()
+		requireSpecApproval = cfg.Workflow.RequireSpecApprovalOrDefault()
 	}
 
 	drifted, _, _ := checkDrift(planDir)
@@ -214,26 +218,46 @@ func gatherFacts(planDir string, meta *planmeta.Meta) (workflow.Facts, error) {
 		TasksComplete:       tasksComplete(planDir),
 		VerificationVerdict: meta.Verification.Verdict,
 		RetryExhausted:      meta.Retry.UnitTest > meta.RetryBudget.UnitTest || meta.Retry.Build > meta.RetryBudget.Build || meta.Retry.IntegrationTest > meta.RetryBudget.IntegrationTest,
+
+		IsQuickFix:          meta.RiskLevel == "quick-fix",
+		PlanningMode:        planningMode,
+		SpecReady:           specReady(planDir),
+		SpecApproved:        meta.SpecApprovedAt != "",
+		RequireSpecApproval: requireSpecApproval,
+		TasksAndTestsReady:  tasksAndTestsReady(planDir),
 	}, nil
 }
 
-// filesReady checks more than existence: eng plan new scaffolds spec.md/
-// tasks.md/tests.md from harness/templates/plan/, which are non-empty
-// *template* content, not a real plan. Treating that as "ready" would let
-// TRIAGED jump straight to PLANNED before the Planner ever did anything —
-// so this also requires spec.md's placeholder title to have been replaced.
-func filesReady(planDir string) bool {
-	for _, n := range []string{"spec.md", "tasks.md", "tests.md"} {
-		info, err := os.Stat(filepath.Join(planDir, n))
-		if err != nil || info.Size() == 0 {
+// specReady checks spec.md alone: exists, non-empty, placeholder-free.
+func specReady(planDir string) bool {
+	data, err := os.ReadFile(filepath.Join(planDir, "spec.md"))
+	if err != nil || len(data) == 0 {
+		return false
+	}
+	return !strings.Contains(string(data), "[Feature Name]")
+}
+
+// tasksAndTestsReady checks tasks.md and tests.md: both templates share
+// spec.md's "[Feature Name]" placeholder marker (see Phase 5 spec.md
+// Decision 12), so the same check applies.
+func tasksAndTestsReady(planDir string) bool {
+	for _, n := range []string{"tasks.md", "tests.md"} {
+		data, err := os.ReadFile(filepath.Join(planDir, n))
+		if err != nil || len(data) == 0 {
+			return false
+		}
+		if strings.Contains(string(data), "[Feature Name]") {
 			return false
 		}
 	}
-	specData, err := os.ReadFile(filepath.Join(planDir, "spec.md"))
-	if err != nil {
-		return false
-	}
-	return !strings.Contains(string(specData), "[Feature Name]")
+	return true
+}
+
+// filesReady is the auto_plan-mode fact: all three files ready at once.
+// Decomposed from specReady/tasksAndTestsReady — identical semantics to
+// Phase 3/4's original filesReady, zero behavior change.
+func filesReady(planDir string) bool {
+	return specReady(planDir) && tasksAndTestsReady(planDir)
 }
 
 func tasksComplete(planDir string) bool {

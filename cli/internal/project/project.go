@@ -22,6 +22,18 @@ type Workflow struct {
 	Triage     bool `yaml:"triage"`
 	PlanReview bool `yaml:"plan_review"`
 	Verifier   bool `yaml:"verifier"`
+
+	// PlanningMode: "" (unset) | "auto_plan" | "spec_first". Empty means
+	// "this project predates Phase 5, or never set it" — PlanningModeOrDefault
+	// resolves that to "auto_plan", the exact behavior every plan created
+	// under Phases 1-4 already has. Only a fresh `eng init` writes
+	// "spec_first" explicitly for a brand-new project.
+	PlanningMode string `yaml:"planning_mode,omitempty"`
+
+	// RequireSpecApproval is a pointer so YAML can distinguish "not set"
+	// (nil, defaults to true) from "explicitly false" — yaml.v3 handles
+	// pointer fields natively, no custom unmarshaling needed here.
+	RequireSpecApproval *bool `yaml:"require_spec_approval,omitempty"`
 }
 
 // enabled reports whether this Workflow struct was ever explicitly set.
@@ -29,6 +41,23 @@ type Workflow struct {
 // treat that as "everything enabled" via EffectiveWorkflow.
 func (w Workflow) enabled() bool {
 	return w.Triage || w.PlanReview || w.Verifier
+}
+
+// PlanningModeOrDefault returns "auto_plan" when unset — the behavior
+// every project.yaml written before Phase 5 already has.
+func (w Workflow) PlanningModeOrDefault() string {
+	if w.PlanningMode == "" {
+		return "auto_plan"
+	}
+	return w.PlanningMode
+}
+
+// RequireSpecApprovalOrDefault returns true when unset.
+func (w Workflow) RequireSpecApprovalOrDefault() bool {
+	if w.RequireSpecApproval == nil {
+		return true
+	}
+	return *w.RequireSpecApproval
 }
 
 type RetryBudget struct {

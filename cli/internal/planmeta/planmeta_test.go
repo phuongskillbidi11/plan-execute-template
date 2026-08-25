@@ -2,6 +2,7 @@ package planmeta
 
 import (
 	"bufio"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -85,4 +86,35 @@ func TestAppendEventWritesJSONLine(t *testing.T) {
 	if len(lines) != 2 {
 		t.Fatalf("expected 2 event lines, got %d: %v", len(lines), lines)
 	}
+}
+
+func TestAppendStructuredEventWritesFlatJSON(t *testing.T) {
+	dir := t.TempDir()
+	err := AppendStructuredEvent(dir, "quick_fix", map[string]interface{}{
+		"summary":      "Changed timeout",
+		"files":        []string{"src/connection.cpp"},
+		"verification": "PASS",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, EventsFileName))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(bytesTrimNewline(data), &decoded); err != nil {
+		t.Fatalf("line is not valid flat JSON: %v (%s)", err, data)
+	}
+	if decoded["type"] != "quick_fix" || decoded["verification"] != "PASS" {
+		t.Fatalf("unexpected payload: %+v", decoded)
+	}
+}
+
+func bytesTrimNewline(b []byte) []byte {
+	for len(b) > 0 && (b[len(b)-1] == '\n' || b[len(b)-1] == '\r') {
+		b = b[:len(b)-1]
+	}
+	return b
 }

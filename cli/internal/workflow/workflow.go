@@ -15,6 +15,9 @@ const (
 	StateNeedsApproval = "NEEDS_APPROVAL"
 	StateNeedsFix      = "NEEDS_FIX"
 	StateCancelled     = "CANCELLED"
+
+	StateNeedsSpecApproval = "NEEDS_SPEC_APPROVAL"
+	StateSpecApproved      = "SPEC_APPROVED"
 )
 
 // Terminal reports whether a state has no further automatic transitions —
@@ -43,6 +46,13 @@ type Facts struct {
 	TasksComplete       bool   // zero remaining "- [ ]" lines in tasks.md
 	VerificationVerdict string // "" | PASS | FAIL
 	RetryExhausted      bool
+
+	IsQuickFix          bool   // risk_level == "quick-fix"
+	PlanningMode        string // "auto_plan" (default/legacy) | "spec_first"
+	SpecReady           bool   // spec.md exists, non-empty, placeholder-free
+	SpecApproved        bool   // plan.yaml's spec_approved_at is set
+	RequireSpecApproval bool
+	TasksAndTestsReady  bool // tasks.md AND tests.md exist, non-empty, placeholder-free
 }
 
 // Decision is the one transition Decide recommends for the current Facts,
@@ -61,10 +71,38 @@ type Decision struct {
 func Decide(f Facts) Decision {
 	switch f.State {
 	case StateTriaged:
+		if f.IsQuickFix {
+			if f.PlanFilesReady {
+				return Decision{NextState: StateExecuting, Reason: "quick-fix: minimal plan present, skipping review/approval"}
+			}
+			return Decision{NextState: StateTriaged, Reason: "waiting on the minimal quick-fix plan (spec.md + tasks.md + tests.md)"}
+		}
+		if f.PlanningMode == "spec_first" {
+			if !f.SpecReady {
+				return Decision{NextState: StateTriaged, Reason: "waiting on Planner to write spec.md"}
+			}
+			if f.RequireSpecApproval {
+				return Decision{NextState: StateNeedsSpecApproval, Reason: "spec.md written — waiting on `eng plan approve-spec`"}
+			}
+			return Decision{NextState: StateSpecApproved, Reason: "spec.md written, spec approval not required"}
+		}
+		// auto_plan (default when PlanningMode is unset) — Phase 3 behavior, unchanged.
 		if f.PlanFilesReady {
 			return Decision{NextState: StatePlanned, Reason: "spec.md/tasks.md/tests.md are present"}
 		}
 		return Decision{NextState: StateTriaged, Reason: "waiting on Planner to write spec.md/tasks.md/tests.md"}
+
+	case StateNeedsSpecApproval:
+		if f.SpecApproved {
+			return Decision{NextState: StateSpecApproved, Reason: "spec approved"}
+		}
+		return Decision{NextState: StateNeedsSpecApproval, Reason: "still waiting on `eng plan approve-spec`"}
+
+	case StateSpecApproved:
+		if f.TasksAndTestsReady {
+			return Decision{NextState: StatePlanned, Reason: "tasks.md/tests.md are present"}
+		}
+		return Decision{NextState: StateSpecApproved, Reason: "waiting on Planner to write tasks.md/tests.md"}
 
 	case StatePlanned:
 		if !f.ReviewRequired {

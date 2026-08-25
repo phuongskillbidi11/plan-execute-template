@@ -48,6 +48,11 @@ func cmdInit(args []string) {
 			Lint:  executil.Command{Shell: det.Lint},
 		},
 		EnabledSkills: []string{"engineering/karpathy-guidelines"},
+		// planning_mode is written explicitly only here, at eng init time for
+		// a brand-new project — an existing .agent/project.yaml is never
+		// touched (see the early-return above), so no project that has
+		// already run eng init under any prior phase is affected by this.
+		Workflow: project.Workflow{PlanningMode: "spec_first"},
 	}
 
 	if err := project.Save(dir, cfg); err != nil {

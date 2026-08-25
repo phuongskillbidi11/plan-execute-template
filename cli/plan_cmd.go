@@ -44,7 +44,7 @@ func reorderFlagsFirst(args []string, boolFlags map[string]bool) []string {
 
 func cmdPlan(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: eng plan <new|drift|retry|review|approve|block|cancel> ...")
+		fmt.Println("Usage: eng plan <new|drift|retry|review|approve|approve-spec|escalate|block|cancel> ...")
 		os.Exit(1)
 	}
 	switch args[0] {
@@ -58,12 +58,16 @@ func cmdPlan(args []string) {
 		planReview(args[1:])
 	case "approve":
 		planApprove(args[1:])
+	case "approve-spec":
+		planApproveSpec(args[1:])
+	case "escalate":
+		planEscalate(args[1:])
 	case "block":
 		planBlock(args[1:])
 	case "cancel":
 		planCancel(args[1:])
 	default:
-		fmt.Println("Usage: eng plan <new|drift|retry|review|approve|block|cancel> ...")
+		fmt.Println("Usage: eng plan <new|drift|retry|review|approve|approve-spec|escalate|block|cancel> ...")
 		os.Exit(1)
 	}
 }
@@ -103,6 +107,9 @@ func planNew(args []string) {
 	}
 
 	tmplDir := filepath.Join(harnessDir(), "templates", "plan")
+	if *risk == "quick-fix" {
+		tmplDir = filepath.Join(harnessDir(), "templates", "quickfix")
+	}
 	if err := copyTree(tmplDir, planDir); err != nil {
 		fmt.Println("error copying templates:", err)
 		os.Exit(1)
@@ -360,4 +367,66 @@ func cutSuffix(s, suffix string) (string, bool) {
 		return s[:len(s)-len(suffix)], true
 	}
 	return s, false
+}
+
+func planApproveSpec(args []string) {
+	flagset := flag.NewFlagSet("plan approve-spec", flag.ExitOnError)
+	by := flagset.String("by", "", "who is approving the spec")
+	flagset.Parse(reorderFlagsFirst(args, map[string]bool{}))
+	rest := flagset.Args()
+	if len(rest) == 0 {
+		fmt.Println("Usage: eng plan approve-spec <plan-dir> [--by <name>]")
+		os.Exit(1)
+	}
+	planDir, _ := filepath.Abs(rest[0])
+
+	meta, err := planmeta.Load(planDir)
+	if err != nil {
+		fmt.Printf("no %s found in %s\n", planmeta.FileName, planDir)
+		os.Exit(1)
+	}
+
+	meta.SpecApprovedAt = time.Now().UTC().Format(time.RFC3339)
+	meta.SpecApprovedBy = *by
+	if err := planmeta.Save(planDir, meta); err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
+	}
+	planmeta.AppendEvent(planDir, "spec_approved", *by)
+	fmt.Printf("Spec approved by %q at %s — this is a requirements approval, not an execution approval.\n", *by, meta.SpecApprovedAt)
+}
+
+func planEscalate(args []string) {
+	flagset := flag.NewFlagSet("plan escalate", flag.ExitOnError)
+	to := flagset.String("to", "", "bug|feature|architecture|high-risk")
+	reason := flagset.String("reason", "", "why this is being escalated")
+	flagset.Parse(reorderFlagsFirst(args, map[string]bool{}))
+	rest := flagset.Args()
+	if len(rest) == 0 || *to == "" {
+		fmt.Println(`Usage: eng plan escalate <plan-dir> --to <bug|feature|architecture|high-risk> [--reason "..."]`)
+		os.Exit(1)
+	}
+	planDir, _ := filepath.Abs(rest[0])
+
+	meta, err := planmeta.Load(planDir)
+	if err != nil {
+		fmt.Printf("no %s found in %s\n", planmeta.FileName, planDir)
+		os.Exit(1)
+	}
+	if meta.RiskLevel != "quick-fix" {
+		fmt.Println("error: only a quick-fix plan can be escalated with this command")
+		os.Exit(1)
+	}
+
+	from := meta.RiskLevel
+	meta.RiskLevel = *to
+	meta.State = workflow.StateTriaged
+	meta.RequiresApproval = *to == "high-risk"
+	if err := planmeta.Save(planDir, meta); err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
+	}
+	planmeta.AppendEvent(planDir, "escalated", fmt.Sprintf("%s -> %s: %s", from, *to, *reason))
+	fmt.Printf("Escalated %s -> %s — state reset to TRIAGED.\n", from, *to)
+	fmt.Println("Flesh out spec.md/tasks.md/tests.md into the full format before continuing — this command only records the fact, it does not regenerate plan content.")
 }

@@ -97,3 +97,48 @@ func TestConfigVersionDefaultsToOneOnLoad(t *testing.T) {
 		t.Fatalf("expected ConfigVersion=1 for a pre-Phase-2 file, got %d", got.ConfigVersion)
 	}
 }
+
+func TestPlanningModeDefaultsToAutoPlan(t *testing.T) {
+	w := Workflow{}
+	if got := w.PlanningModeOrDefault(); got != "auto_plan" {
+		t.Fatalf("expected auto_plan, got %q", got)
+	}
+}
+
+func TestPlanningModeExplicitSpecFirst(t *testing.T) {
+	w := Workflow{PlanningMode: "spec_first"}
+	if got := w.PlanningModeOrDefault(); got != "spec_first" {
+		t.Fatalf("expected spec_first, got %q", got)
+	}
+}
+
+func TestRequireSpecApprovalDefaultsTrue(t *testing.T) {
+	w := Workflow{}
+	if !w.RequireSpecApprovalOrDefault() {
+		t.Fatal("expected default true")
+	}
+}
+
+func TestRequireSpecApprovalExplicitFalse(t *testing.T) {
+	f := false
+	w := Workflow{RequireSpecApproval: &f}
+	if w.RequireSpecApprovalOrDefault() {
+		t.Fatal("expected explicit false to be respected")
+	}
+}
+
+func TestLegacyProjectYAMLWithoutPlanningModeStillLoads(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".agent"), 0o755)
+	// Simulates a Phase 1-4 project.yaml: no planning_mode/require_spec_approval keys at all.
+	content := "project_name: x\nmode: modern\nworkflow:\n  triage: true\n  plan_review: true\n  verifier: true\n"
+	os.WriteFile(filepath.Join(dir, ConfigPath), []byte(content), 0o644)
+
+	cfg, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Workflow.PlanningModeOrDefault() != "auto_plan" {
+		t.Fatalf("expected a pre-Phase-5 project.yaml to resolve to auto_plan, got %q", cfg.Workflow.PlanningModeOrDefault())
+	}
+}

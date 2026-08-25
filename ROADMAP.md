@@ -5,9 +5,11 @@
 > `.plans/2026-08-24-v2-harness-foundation/` (global install foundation),
 > `.plans/2026-08-24-v2-harness-phase2/` (Triage/Plan Reviewer/Verifier/hooks/drift/retry),
 > `.plans/2026-08-24-v2-harness-phase3/` (orchestrator, lifecycle state machine, Claude
-> Code adapter), and `.plans/2026-08-24-v2-harness-phase4-context/` (context selection,
-> skill/doc/task retrieval, bounded verification output) — see those plans for the current
-> architecture.
+> Code adapter), `.plans/2026-08-24-v2-harness-phase4-context/` (context selection,
+> skill/doc/task retrieval, bounded verification output), and
+> `.plans/2026-08-24-v2-harness-phase5-runtime/` (natural-language runtime routing, Quick
+> Fix/Spec-First workflows, log retention, Agent/Tool adapter separation) — see those plans
+> for the current architecture.
 
 Phases are ordered by value-to-complexity ratio. Each phase is independent —
 you can skip ahead or implement phases in a different order. Every enhancement

@@ -92,3 +92,59 @@ func TestTerminalStates(t *testing.T) {
 		}
 	}
 }
+
+func TestQuickFixSkipsStraightToExecuting(t *testing.T) {
+	waiting := Decide(Facts{State: StateTriaged, IsQuickFix: true, PlanFilesReady: false})
+	if waiting.NextState != StateTriaged {
+		t.Fatalf("expected to stay TRIAGED until minimal plan exists, got %+v", waiting)
+	}
+	ready := Decide(Facts{State: StateTriaged, IsQuickFix: true, PlanFilesReady: true})
+	if ready.NextState != StateExecuting {
+		t.Fatalf("expected EXECUTING directly, got %+v", ready)
+	}
+}
+
+func TestSpecFirstRequiresSpecApprovalBeforeTasks(t *testing.T) {
+	waitingSpec := Decide(Facts{State: StateTriaged, PlanningMode: "spec_first", SpecReady: false})
+	if waitingSpec.NextState != StateTriaged {
+		t.Fatalf("expected to stay TRIAGED, got %+v", waitingSpec)
+	}
+	needsApproval := Decide(Facts{State: StateTriaged, PlanningMode: "spec_first", SpecReady: true, RequireSpecApproval: true})
+	if needsApproval.NextState != StateNeedsSpecApproval {
+		t.Fatalf("expected NEEDS_SPEC_APPROVAL, got %+v", needsApproval)
+	}
+	skipApproval := Decide(Facts{State: StateTriaged, PlanningMode: "spec_first", SpecReady: true, RequireSpecApproval: false})
+	if skipApproval.NextState != StateSpecApproved {
+		t.Fatalf("expected SPEC_APPROVED when approval not required, got %+v", skipApproval)
+	}
+}
+
+func TestNeedsSpecApprovalGate(t *testing.T) {
+	blocked := Decide(Facts{State: StateNeedsSpecApproval, SpecApproved: false})
+	if blocked.NextState != StateNeedsSpecApproval {
+		t.Fatalf("expected to stay blocked, got %+v", blocked)
+	}
+	approved := Decide(Facts{State: StateNeedsSpecApproval, SpecApproved: true})
+	if approved.NextState != StateSpecApproved {
+		t.Fatalf("expected SPEC_APPROVED, got %+v", approved)
+	}
+}
+
+func TestSpecApprovedWaitsForTasksAndTests(t *testing.T) {
+	waiting := Decide(Facts{State: StateSpecApproved, TasksAndTestsReady: false})
+	if waiting.NextState != StateSpecApproved {
+		t.Fatalf("expected to stay SPEC_APPROVED, got %+v", waiting)
+	}
+	ready := Decide(Facts{State: StateSpecApproved, TasksAndTestsReady: true})
+	if ready.NextState != StatePlanned {
+		t.Fatalf("expected PLANNED, got %+v", ready)
+	}
+}
+
+func TestAutoPlanPathUnaffectedByNewFields(t *testing.T) {
+	// Zero-value PlanningMode/IsQuickFix must reproduce Phase 3's exact behavior.
+	d := Decide(Facts{State: StateTriaged, PlanFilesReady: true})
+	if d.NextState != StatePlanned {
+		t.Fatalf("expected PLANNED (auto_plan, unchanged), got %+v", d)
+	}
+}

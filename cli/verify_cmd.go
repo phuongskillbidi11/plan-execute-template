@@ -9,8 +9,10 @@ import (
 
 	"eng/internal/executil"
 	"eng/internal/gitutil"
+	"eng/internal/logprune"
 	"eng/internal/planmeta"
 	"eng/internal/project"
+	"eng/internal/taskscope"
 )
 
 func cmdVerify(args []string) {
@@ -83,6 +85,9 @@ func runVerify(planDir string) (bool, string, error) {
 
 		ctxCfg := loadContextConfig(repoRoot)
 		logPath, logErr := writeFullLog(repoRoot, "verify", out)
+		if logErr == nil {
+			logprune.Prune(filepath.Join(repoRoot, ".agent", "logs"), ctxCfg.MaxLogFiles, ctxCfg.MaxLogAgeDays, ctxCfg.MaxLogTotalMB, false)
+		}
 		display := out
 		if ctxCfg.SummarizeToolOutput {
 			display = summarizeOutput(out, ctxCfg.MaxLogLines)
@@ -111,6 +116,15 @@ func runVerify(planDir string) (bool, string, error) {
 
 	if err := os.WriteFile(filepath.Join(planDir, "verify-report.md"), []byte(report.String()), 0o644); err != nil {
 		return pass, report.String(), err
+	}
+
+	if meta.RiskLevel == "quick-fix" && pass {
+		summary, _ := taskscope.GoalSummary(filepath.Join(planDir, "spec.md"))
+		planmeta.AppendStructuredEvent(planDir, "quick_fix", map[string]interface{}{
+			"summary":      summary,
+			"files":        changed,
+			"verification": verdict,
+		})
 	}
 
 	return pass, report.String(), nil
