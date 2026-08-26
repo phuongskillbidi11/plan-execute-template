@@ -1,242 +1,73 @@
-# Planner-Executor Template — Roadmap
-
-> **2026-08-24:** Phases below describe V1 template evolution. The global-install /
-> multi-project direction they were pointing at is now superseded by
-> `.plans/2026-08-24-v2-harness-foundation/` (global install foundation),
-> `.plans/2026-08-24-v2-harness-phase2/` (Triage/Plan Reviewer/Verifier/hooks/drift/retry),
-> `.plans/2026-08-24-v2-harness-phase3/` (orchestrator, lifecycle state machine, Claude
-> Code adapter), `.plans/2026-08-24-v2-harness-phase4-context/` (context selection,
-> skill/doc/task retrieval, bounded verification output), and
-> `.plans/2026-08-24-v2-harness-phase5-runtime/` (natural-language runtime routing, Quick
-> Fix/Spec-First workflows, log retention, Agent/Tool adapter separation), and
-> `.plans/2026-08-25-v2-harness-phase6-skills/` (multi-domain skill ecosystem, dependency
-> graph, skill router), and `.plans/2026-08-25-v2-harness-phase7-tools/` (tool/MCP adapter
-> runtime, capability/risk model, role permission enforcement, audited invocation) — see
-> those plans for the current architecture.
-
-Phases are ordered by value-to-complexity ratio. Each phase is independent —
-you can skip ahead or implement phases in a different order. Every enhancement
-must itself follow the Karpathy principles: think before adding, keep it simple,
-surgical changes only.
-
----
-
-## Phase 1 — Auto-detection and config (implement now)
-
-**Goal:** Eliminate manual placeholder replacement. A single `init.sh` command
-sets up the template for any project type.
-
-### Deliverables
-
-| File | Action |
-|---|---|
-| `scripts/detect-project.sh` | Scan for sentinel files; output build/test/run commands |
-| `.planner-executor/config.yaml.template` | Canonical config schema |
-| `scripts/init.sh` | Orchestrator: copies template + runs detection + writes config |
-| `scripts/plan-executor.sh` | Updated to read `build_cmd`/`test_cmd` from config |
-
-### How detection works
-
-Scan for well-known files in priority order:
-
-```
-idf_component.yml / sdkconfig  →  ESP-IDF
-Cargo.toml                      →  Rust
-package.json                    →  Node.js / TypeScript
-requirements.txt / pyproject.toml / setup.py  →  Python
-go.mod                          →  Go
-CMakeLists.txt (non-ESP-IDF)    →  C/C++
-Makefile                        →  Generic Make
-```
-
-### Upgrade path for existing projects
-
-```bash
-# In your existing project that already uses an older template:
-curl -sSL https://raw.githubusercontent.com/.../init.sh | bash -s -- --upgrade
-# --upgrade skips CLAUDE.md and copilot-instructions.md (preserves customizations)
-# --upgrade only writes/updates scripts/ and .planner-executor/
-```
-
----
-
-## Phase 2 — Enhanced plan management
-
-**Goal:** Replace raw file editing with a minimal interactive interface for
-browsing, marking, and summarizing plans.
-
-### Deliverables
-
-| File | Action |
-|---|---|
-| `scripts/plan-executor.sh` | Add `tui` command (requires `fzf`) |
-| `scripts/plan-executor.sh` | Add `done <folder> <task-id>` command to mark a task [x] manually |
-| `scripts/plan-executor.sh` | Add `summary` command: aggregate all plan statuses into one table |
-
-### TUI flow (fzf-based)
-
-```
-fzf list of plans → select plan → fzf list of tasks → select task → mark done / view test
-```
-
-No external dependencies beyond `fzf` (available via apt/brew/winget).
-
-### Upgrade path
-
-`plan-executor.sh` is self-contained. Drop the new version over the old one.
-No config changes required.
-
----
-
-## Phase 3 — Support for other AI executors
-
-**Goal:** Make the Executor role pluggable — not just Copilot.
-
-### Deliverables
-
-| File | Action |
-|---|---|
-| `.cursor/rules.md` | Cursor-specific Executor instructions (same logic, Cursor format) |
-| `scripts/executor.sh` | Feed a plan to any LLM API (OpenAI / Anthropic) via CLI |
-| `.planner-executor/config.yaml` | Add `executor` key: `copilot` \| `cursor` \| `api` |
-| `README.md` | Section: "Choosing your executor" |
-
-### executor.sh sketch
-
-```bash
-executor.sh run .plans/2025-05-01-feature/
-# Reads spec + tasks + tests, constructs system prompt, calls API,
-# streams implementation instructions to stdout.
-# Requires: ANTHROPIC_API_KEY or OPENAI_API_KEY in environment.
-```
-
-### Upgrade path
-
-New files only — no existing files modified. Opt in by setting
-`executor: api` in `.planner-executor/config.yaml`.
-
----
-
-## Phase 4 — GitHub Actions integration
-
-**Goal:** Automate plan creation and execution triggers from GitHub issues and PRs.
-
-### Deliverables
-
-| File | Action |
-|---|---|
-| `.github/workflows/generate-plan.yml` | On `issues` labeled `plan`: call Claude API, commit plan as PR |
-| `.github/workflows/validate-plan.yml` | On PR touching `.plans/`: check Karpathy compliance (task granularity, test pass/fail conditions) |
-| `.github/workflows/execute-plan.yml` | On issue comment `/execute`: run the plan via `executor.sh` in CI |
-| `scripts/validate-plan.sh` | Standalone validator — checks tasks have file paths, tests have Pass/Fail |
-
-### Karpathy compliance check (validate-plan.sh)
-
-Checks applied to every `tasks.md`:
-- Each `- [ ]` line contains a backtick-quoted file path
-- No task is longer than 10 lines (surgical = small)
-- Each `tests.md` block contains both `**Pass:**` and `**Fail:**`
-- `spec.md` contains an `## Out of scope` section
-
-### Upgrade path
-
-New workflow files only. Requires `ANTHROPIC_API_KEY` secret in repo settings.
-
----
-
-## Phase 5 — Automated failure recovery
-
-**Goal:** Allow the executor to retry failed tasks by automatically invoking
-Claude to amend the plan, up to a configurable retry limit.
-
-### Deliverables
-
-| File | Action |
-|---|---|
-| `scripts/executor.sh` | Add `--retry N` flag; on test failure, call Claude API with error + task, patch `tasks.md`, retry |
-| `.plans/.../amendments/` | Auto-created subfolder; each retry writes `amendment-1.md`, `amendment-2.md` |
-| `.planner-executor/config.yaml` | Add `max_retries: 3` key |
-
-### Amendment log format
-
-```
-.plans/2025-05-01-feature/
-  amendments/
-    amendment-1.md    ← original task + error + Claude's revised task
-    amendment-2.md    ← second attempt if first amendment also failed
-```
-
-### Upgrade path
-
-Only `executor.sh` and config schema change. Opt in with `max_retries: 1`.
-
----
-
-## Phase 6 — Documentation and real-world examples
-
-**Goal:** Reduce time-to-first-plan for new users to under 10 minutes.
-
-### Deliverables
-
-| File | Action |
-|---|---|
-| `examples/esp-idf/` | Complete plan set: OTA update (3-file plan as-built) |
-| `examples/python-fastapi/` | Complete plan set: add JWT auth endpoint |
-| `examples/nextjs/` | Complete plan set: add server-side dark mode cookie |
-| `examples/rust-cli/` | Complete plan set: add subcommand with clap |
-| `README.md` | Add "Examples" section linking to each |
-| `README.md` | Add animated GIF (record with `asciinema`, convert with `agg`) |
-
-### Upgrade path
-
-`examples/` is read-only reference material. No existing file changes.
-
----
-
-## Upgrading existing projects
-
-When a new template version is released, existing projects can upgrade without
-losing their customizations using this rule:
-
-**User-owned files** (never overwritten by upgrade):
-- `CLAUDE.md`
-- `.github/copilot-instructions.md`
-- `.planner-executor/config.yaml`
-- All `.plans/**` content
-
-**Template-owned files** (safe to overwrite):
-- `scripts/*.sh`
-- `.claude/planner-instructions.md`
-- `.cursor/rules.md`
-- `.github/workflows/*.yml`
-
-### Upgrade command (Phase 1+)
-
-```bash
-./scripts/init.sh --upgrade
-```
-
-This overwrites only template-owned files and re-runs detection to refresh
-auto-detected commands in config.
-
-### Manual upgrade (before init.sh --upgrade exists)
-
-```bash
-# Copy only scripts — preserve everything else
-cp -r new-template/scripts/ ./scripts/
-cp new-template/.claude/planner-instructions.md ./.claude/
-```
-
----
-
-## Backlog (unscheduled)
-
-These ideas have merit but are below the current priority threshold:
-
-- **VS Code extension** — sidebar panel showing plan status without opening
-  terminal
-- **Notion/Linear sync** — push plan tasks to a project management tool
-- **Multi-executor parallel execution** — run independent task groups
-  concurrently across Copilot + Claude API
-- **Plan diffing** — `plan-executor.sh diff` compares two plan versions to show
-  what changed between amendment rounds
+# Roadmap
+
+Phases 1–7 built the Global Engineering Harness (global install, plan lifecycle state machine,
+context routing, natural-language runtime, multi-domain skill ecosystem, audited tool/MCP
+runtime). Phase 8 validated it with a real benchmark suite instead of assuming it worked. See
+[`README.md`](README.md) for what's implemented today and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+for how it fits together. The detailed design record for each phase lives in its own
+`.plans/YYYY-MM-DD-v2-harness-*/spec.md` and `DECISION_LOG.md` — this file stays a short,
+current-reality summary, not a phase-by-phase archive.
+
+## Where things stand
+
+**Internal dogfooding / early team use.** Phase 8's scorecard: 7/10 dimensions Strong, 3/10
+Adequate, 0/10 Weak, 0 P0 (blocking) backlog items. Decision: `READY_TO_EXPAND` — see
+[`benchmarks/SCORECARD.md`](benchmarks/SCORECARD.md).
+
+## Now: Core Refinement
+
+Address the real, benchmark-confirmed gaps in [`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md)
+before adding new surface area:
+
+- **P1 — Quick Fix triage misclassification.** Broaden the triage keyword list (or add a
+  size-based heuristic) so plausible numeric/parameter-tweak requests route to Quick Fix
+  without a manual `--risk quick-fix` override.
+- **P1 — Doc-context over-matching.** Bring `internal/docsearch.Match`'s doc-section routing
+  closer to `internal/skillmatch.Score`'s weighted model instead of its current apparent
+  simple word-overlap approach.
+- **P2 — Dual `tasks.md` completion conventions.** Either drop the per-task `Status:` marker in
+  favor of the bottom checklist alone, or make `tasksComplete()` recognize both — and make the
+  "unchecked items" message name the specific blocking line(s).
+
+Each of these needs its own scoped plan under `.plans/` with a regression test proving the fix,
+followed by a re-run of the relevant benchmark scenario to confirm it actually closed the gap —
+not just a code change asserted to fix it.
+
+## Next: continued real-world dogfooding
+
+Use the harness on real, non-benchmark work across more than one domain before expanding scope
+further. Feed anything that surfaces — a misrouted skill, an approval-friction pattern, a
+context bundle that's too large in practice — back into `benchmarks/BACKLOG.md` the same way
+Phase 8 did, with evidence, not assertion.
+
+## Later: MCP / skill distribution expansion
+
+Only after the refinement backlog above is addressed:
+
+- A real MCP JSON-RPC transport (today's one MCP-style adapter, `docs-search`, is a
+  deterministic local mock — see [`docs/tools.md`](docs/tools.md)).
+- Broader skill packaging/distribution beyond directory-tree + precedence-tier resolution (a
+  version-constrained skill package manager is explicitly not built yet).
+- Additional real tool adapters, added the same way as today's (`tooladapter.Adapter` +
+  registration in `cli/tools_cmd.go`), each with an explicit risk-tier and approval-policy
+  decision — never silently defaulted to `ALLOWED`.
+
+## Explicitly not planned right now
+
+These would meaningfully increase scope/risk without a demonstrated need yet — revisit only if
+real usage surfaces one:
+
+- A tool/skill marketplace or public registry
+- Live industrial-control write adapters (PLC/Modbus/OPC UA) — Phase 7's risk tiers exist so a
+  future one has a safety model to plug into, not because one is scheduled
+- Cloud telemetry, a benchmark SaaS, or a distributed-runner benchmark platform — Phase 8
+  deliberately stayed local/deterministic; see [`benchmarks/README.md`](benchmarks/README.md)
+- Multi-executor parallel/autonomous execution across independent task groups
+
+## V1 template
+
+The original per-project Planner/Executor template (`scripts/`, project-local `skills/`,
+`.plans/`) is not on this roadmap — it is a completed, stable surface the harness is required
+to keep working unmodified (see [Backward compatibility promise](README.md#backward-compatibility-promise)
+in the README). Changes to it happen only to fix an actual regression, never as a feature
+enhancement.
