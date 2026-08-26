@@ -1,0 +1,28 @@
+scenario: large-context-auth-validation
+mode: harness-v2
+fixture_total_tracked_files: 8   # api/, auth/, cache/, cli/, db/, utils/ (6 packages/dirs) + go.mod + docs/src-map.md
+fixture_total_doc_sections: 6    # one ### section per package in docs/src-map.md
+context:
+  docs_matched: 4          # auth/, cli/, api/, utils/ — NOT db/, NOT cache/
+  docs_expected_relevant: 1  # only auth/ is actually relevant to this request
+  skills_matched: 1          # karpathy-guidelines only (explicitly enabled) — no false positives
+implementation:
+  files_changed: n/a   # this scenario measures context selection only, no edit was made
+finding: >
+  REAL FINDING, added to benchmarks/BACKLOG.md (not fixed — out of Phase 8's bounded-fix
+  scope): `eng context project`'s docs/src-map.md routing (`internal/docsearch.Match`)
+  matched 4 of 6 sections (auth/, cli/, api/, utils/) for a request that should concern
+  only `auth/` — a 67% false-positive rate against this fixture's own doc section count.
+  By contrast, `eng context skills` for the exact same request matched only the always-
+  explicit karpathy-guidelines and correctly excluded every domain skill (no shipped
+  skill concerns generic auth/token validation) — the skill router (Phase 6,
+  `skillmatch.Score`'s weighted tag/trigger/description-word model) is measurably
+  tighter than the docs router (Phase 4, `docsearch.Match`'s apparent simple word-
+  overlap matching) on identical input. Phase 4's "large knowledge base != large
+  prompt" principle holds well for skills, less well for docs/project context.
+notes: >
+  This is a genuine gap in the *doc* half of Phase 4's context routing, not the skill
+  half — see benchmarks/CONTEXT_EFFICIENCY.md for the full discussion alongside
+  Category 5's skill-routing result. `db/` and `cache/` were correctly excluded in both
+  cases, so the routing isn't simply "match everything" — it's specifically
+  over-permissive relative to the tighter skill-routing bar.

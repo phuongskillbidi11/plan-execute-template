@@ -1,0 +1,80 @@
+scenario: failure-safety
+mode: harness-v2
+sub_cases:
+  - id: "10.1"
+    name: reviewer-reject
+    setup: "--risk architecture plan, minimal spec/tasks/tests"
+    action: "eng plan review <dir> --verdict REJECT, then eng workflow advance"
+    observed_transition: "PLANNED -> NEEDS_REPLAN (review verdict REJECT)"
+    result: PASS
+    notes: >
+      Never reached APPROVED. Confirmed deterministic via eng workflow status
+      immediately after.
+
+  - id: "10.2"
+    name: verifier-fail
+    setup: "plan advanced to EXECUTING against benchmarks/fixtures/bug (seeded
+      off-by-one left unfixed on purpose)"
+    action: "eng verify run against the plan's write_scope"
+    observed_verdict: FAIL
+    result: PASS
+    notes: >
+      State did not reach COMPLETED. Confirmed via `go test` showing the same
+      failing assertion documented in bug-lastn-off-by-one-harness-v2.yaml
+      before the real fix was applied there.
+
+  - id: "10.3"
+    name: drift-after-approval
+    setup: "plan bench-failsafe-3b/2026-08-26-drift-test2, advanced cleanly to
+      APPROVED (status confirmed 'no drift detected — Executor may begin')"
+    action: >
+      Modified main.go (ReconnectTimeoutMS 1000 -> 9999) while still APPROVED,
+      then ran `eng plan drift` (standalone) and `eng workflow advance`.
+    observed:
+      standalone_drift_check: "PLAN_DRIFT_DETECTED — main.go changed since plan created"
+      workflow_advance_transition: "APPROVED -> NEEDS_REPLAN (PLAN_DRIFT_DETECTED before execution started)"
+    result: PASS
+    notes: >
+      First attempt at this sub-case used a sed pattern that did not match the
+      real source (test-authoring bug, not a harness defect) and produced a
+      false negative; that scratch plan was discarded and this sub-case was
+      redone from a fresh fixture copy with a verified real edit. See
+      DECISION_LOG.md / session notes for the discarded attempt.
+
+  - id: "10.4"
+    name: approval-missing
+    setup: "bench-failsafe-4/2026-08-26-approval-test, --risk high-risk,
+      advanced through REVIEWED (verdict PASS)"
+    action: "eng workflow advance called repeatedly WITHOUT eng plan approve"
+    observed_transitions:
+      - "REVIEWED -> NEEDS_APPROVAL (run `eng plan approve` before execution can begin)"
+      - "NEEDS_APPROVAL -> NEEDS_APPROVAL (Still in NEEDS_APPROVAL — still waiting on `eng plan approve`)"
+    result: PASS
+    notes: >
+      State never advances past NEEDS_APPROVAL no matter how many times
+      `eng workflow advance` is called; requires_approval flag stays true
+      (NOT yet approved) throughout.
+
+  - id: "10.5"
+    name: tool-capability-denied
+    setup: "same bench-failsafe-4 scratch repo (no git remote configured)"
+    action: "eng tools invoke planner git.push <plan-dir>"
+    observed: "REFUSED (DENIED): role may not invoke WRITE-risk capabilities"
+    exit_code: 1
+    git_push_actually_ran: false
+    result: PASS
+    notes: >
+      Denial is a pure role/risk-ceiling policy decision (agent.RolePermissions /
+      toolpolicy.Decide) — no git subprocess is spawned before the refusal, so
+      no push attempt occurs regardless of remote configuration. Reuses the
+      exact case already proven in Phase 7's own E2E tests.
+
+summary:
+  all_five_deterministic: true
+  regressions_found: 0
+notes: >
+  All five failure/safety sub-cases produce the exact state transitions the
+  Phase 8 plan specified, with no core harness behavior changed to make any
+  of them pass. Sub-case 10.3 required a clean redo after a self-caught
+  test-authoring mistake (documented above and in the session record), not a
+  harness fix.

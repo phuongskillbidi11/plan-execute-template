@@ -1,0 +1,49 @@
+scenario: feature-csv-export
+mode: harness-v2
+workflow_selected: spec_first
+context:
+  skills: n/a   # not directly recorded for this request; see quick-fix result for a skill-selection example
+  docs: n/a
+  files: 1
+  context_bundle_lines: 85
+tasks_tests_absent_before_spec_approval: true   # confirmed: [Feature Name] placeholder still present in tasks.md/tests.md at NEEDS_SPEC_APPROVAL
+implementation:
+  files_changed: 1   # main.go — a stray compiled binary (featurebench.exe) also diffed in this
+                      # run due to a benchmark test-setup artifact (a binary was accidentally
+                      # left in the committed fixture from Task 3's own build verification,
+                      # now removed and .gitignore'd — not a harness defect)
+  unexpected_files_changed: 0
+verification:
+  verdict: PASS
+human_interventions: 3   # spec approval, plan review verdict, drift recovery (see finding below)
+state_path: >
+  TRIAGED -> NEEDS_SPEC_APPROVAL -> SPEC_APPROVED -> PLANNED -> REVIEWED -> APPROVED ->
+  NEEDS_REPLAN -> PLANNED -> REVIEWED -> APPROVED -> EXECUTING -> VERIFYING -> COMPLETED
+finding_1_process: >
+  Self-inflicted, not a harness defect: the acting Executor (this session) edited main.go
+  while the plan was still at APPROVED, before advancing to EXECUTING. Drift detection
+  correctly caught this (APPROVED -> NEEDS_REPLAN, "PLAN_DRIFT_DETECTED before execution
+  started") and blocked forward progress rather than silently continuing. Recovered by
+  reverting the edit, re-advancing cleanly through review/approval to EXECUTING, then
+  re-applying the same edit at the correct point. This is positive evidence for Category 7
+  (Failure/Safety) — drift detection works exactly as designed, catching a real ordering
+  mistake — captured here rather than duplicated as a separate synthetic failure-safety run.
+finding_2_defect: >
+  REAL DEFECT, added to benchmarks/BACKLOG.md, not fixed (out of this plan's bounded-fix
+  scope): the "plan" template's `tasks.md` has two independent completion-tracking
+  conventions — a `**Status:** \`[x]\`` marker per task, AND a separate bottom "Completion
+  checklist" section using `- [ ]` list items. `eng workflow advance`'s `tasksComplete()`
+  scans only for lines literally starting with `"- [ ]"` — it reads the bottom aggregate
+  checklist, not the per-task Status markers. Marking every individual task's Status to
+  `[x]` alone left the plan reporting "tasks.md still has unchecked items" until the
+  separate bottom checklist was also explicitly marked. The mechanism is internally
+  consistent (the bottom checklist genuinely is meant to be the final human/Executor
+  sign-off) but the UX is non-obvious — an Executor could reasonably believe marking every
+  task's own Status field is sufficient and get stuck. Reproduced directly; see
+  `.plans/2026-08-26-v2-harness-phase8-benchmark/tasks.md` Task 5 notes for the exact
+  grep evidence.
+notes: >
+  Confirms the core Spec-First claim: tasks.md/tests.md genuinely did not exist in
+  implementation-ready form before `eng plan approve-spec` was run — the one hard,
+  falsifiable success criterion for this category. Two real findings surfaced along the
+  way (one confirms a safety property works; one is a genuine template/engine UX gap).

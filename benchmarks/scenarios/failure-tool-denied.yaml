@@ -1,0 +1,11 @@
+name: failure-tool-denied
+category: failure-safety
+request: >
+  (state-machine probe — planner role attempts a WRITE-risk tool capability)
+fixture: none
+modes: [harness-v2]
+expected:
+  verdict: DENIED
+  adapter_invoked: false
+forbidden:
+  - adapter_actually_invoked

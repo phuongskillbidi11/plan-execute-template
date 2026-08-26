@@ -1,0 +1,28 @@
+scenario: quick-fix-timeout
+mode: v1
+workflow_selected: none   # V1 has exactly one path — full spec/tasks/tests scaffold, always
+context:
+  skills: n/a              # no skill routing exists in V1
+  docs: n/a                # no context routing exists in V1
+  files: 1
+artifacts_scaffolded:
+  - spec.md
+  - tasks.md
+  - tests.md
+implementation:
+  files_changed: 1
+  unexpected_files_changed: 0
+verification:
+  verdict: PASS
+  method: "manual: go build ./... && go run . | grep '1500 ms' (plan-executor.sh test itself
+    failed in this environment only because it shells out to python3, which is not on PATH
+    here — python.exe is present but not aliased as python3; this is a local-machine PATH
+    quirk, not a V1 defect, and the underlying test command succeeded when run directly)"
+human_interventions: 1   # this session authored spec.md/tasks.md/tests.md by hand, acting as Planner
+manual_low_level_steps: 4   # plan-executor.sh new, hand-write 3 files, hand-edit main.go, mark task done, run test
+notes: >
+  V1 always scaffolds the full 3-file spec/tasks/tests template regardless of change size
+  — there is no lightweight path. The Planner (this session, acting per CLAUDE.md's
+  documented role) still kept the *content* proportionally minimal for a change this
+  small (a two-sentence spec, one task, one test) — V1's cost for a trivial change is
+  authoring overhead for files that exist either way, not necessarily verbose content.

@@ -1,0 +1,60 @@
+scenario: legacy-v1-compat
+modes:
+  - v1
+  - harness-v2
+
+mode_v1:
+  fixture: benchmarks/fixtures/legacy (V1-shaped project: CLAUDE.md, .plans/.gitkeep,
+    skills/example/SKILL.md legacy heading, .planner-executor/config.yaml, go.mod/main.go —
+    no skills/manifest.json, no .agent/)
+  commands_run:
+    - "./scripts/load_skill.sh list"
+    - "./scripts/plan-executor.sh new smoke-check"
+  observed:
+    load_skill_list: >
+      "No manifest found at skills/manifest.json\nRun ./scripts/update-manifest.sh to
+      generate it." — unchanged V1 behavior; the fixture deliberately has no manifest,
+      matching what a real never-harnessed legacy project looks like.
+    plan_executor_new: >
+      "Plan scaffolded: .plans/2026-08-26-smoke-check" plus the standard four numbered
+      next-steps lines; the plan directory was created exactly where V1 always creates it,
+      with no reference anywhere in the output to the harness, .agent/, or eng.
+  result: PASS
+  notes: >
+    Confirms V1's own scripts behave identically whether or not the harness has ever
+    touched this machine — nothing about Phases 1-7 altered scripts/load_skill.sh or
+    scripts/plan-executor.sh.
+
+mode_harness_v2:
+  fixture: benchmarks/fixtures/legacy (same recipe, fresh scratch copy)
+  commands_run:
+    - "eng init"
+    - "eng doctor"
+    - "eng workflow start \"Print a friendly greeting on startup.\""
+  observed:
+    eng_init: >
+      "Created .agent/project.yaml — mode: hybrid, stack: go" /
+      "Existing CLAUDE.md / .plans/ / skills/ were left untouched." — mode was
+      auto-detected as hybrid (project.DetectMode's legacy-signal detection) with no
+      explicit --mode flag needed; the pre-existing CLAUDE.md, .plans/.gitkeep, and
+      skills/example/SKILL.md were not modified, renamed, or migrated.
+    eng_doctor: >
+      "Project mode: hybrid (.agent/project.yaml present)" / "Detected stack: go" — reports
+      the project cleanly, no error/warning about the legacy files' non-harness shape.
+    eng_workflow_start: >
+      Triage suggested "feature"; scaffolded a normal TRIAGED-state plan under .plans/
+      alongside where a V1 plan would also land, with the standard "waiting on Planner to
+      write spec.md" next-step — no different from running the same command against a
+      harness-native project.
+  required_migration_steps: 0
+  result: PASS
+  notes: >
+    Zero required migration: no file rename, no manifest regeneration, no config edit was
+    needed before eng doctor/eng workflow start worked normally. hybrid mode is what
+    project.DetectMode assigns automatically to a project matching this exact legacy
+    fixture shape (CLAUDE.md + .plans/ + skills/ + no .agent/).
+
+summary:
+  v1_behavior_unchanged: true
+  v2_migration_required: false
+  result: PASS

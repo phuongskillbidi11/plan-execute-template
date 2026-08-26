@@ -1,0 +1,12 @@
+name: legacy-v1-compat
+category: legacy
+request: >
+  (no natural-language request — this scenario validates V1 script/config compatibility,
+  not a workflow request)
+fixture: fixtures/legacy
+modes: [v1, harness-v2]
+expected:
+  v1_unaffected: true
+  harness_requires_no_migration: true
+forbidden:
+  - forced_migration_step

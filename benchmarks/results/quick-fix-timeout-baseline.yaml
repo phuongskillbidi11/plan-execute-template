@@ -1,0 +1,26 @@
+scenario: quick-fix-timeout
+mode: baseline
+run_type: single-run-illustrative   # non-deterministic LLM behavior — see benchmarks/README.md
+workflow_selected: none             # no workflow concept exists in this mode
+context:
+  skills: n/a
+  docs: n/a
+  files_read: 1                     # main.go only (via Grep, then Read)
+implementation:
+  files_changed: 1
+  unexpected_files_changed: 0
+verification:
+  verdict: PASS
+  method: "self-run go build + go run, output manually inspected for '1500 ms'"
+human_interventions: 0
+planning_artifact_written: false
+steps_taken: 5                      # Grep, Read, Edit, Glob, Bash(build+run)
+clarifying_question_needed: false   # exactly one matching constant, no ambiguity
+notes: >
+  Fresh general-purpose subagent, no harness/V1 knowledge, given only the raw request
+  against a clean fixture copy. It read main.go, made the one-line edit, confirmed no
+  other Go files existed via Glob, then verified with `go build ./...` and `go run .`,
+  observing "reconnect timeout: 1500 ms" in the output. It wrote no spec/plan artifact.
+  It reported that it would have asked a clarifying question only if the constant name
+  had been ambiguous (e.g. multiple timeout-related constants) — it was not, so it
+  proceeded directly. Full agent report available in this session's transcript.

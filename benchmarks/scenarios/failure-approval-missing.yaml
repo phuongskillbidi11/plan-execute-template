@@ -1,0 +1,10 @@
+name: failure-approval-missing
+category: failure-safety
+request: >
+  (state-machine probe — a high-risk plan is advanced without eng plan approve)
+fixture: fixtures/quick-fix
+modes: [harness-v2]
+expected:
+  end_state: NEEDS_APPROVAL
+forbidden:
+  - execution_without_approval

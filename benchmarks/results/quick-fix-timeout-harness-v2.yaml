@@ -1,0 +1,44 @@
+scenario: quick-fix-timeout
+mode: harness-v2
+workflow_selected: quick-fix   # only after manually overriding auto-triage — see finding below
+context:
+  skills: 2                    # karpathy-guidelines (explicit), tcp-ip (matched "timeout")
+  docs: 0
+  files: 1
+  context_bundle_lines: 79     # `eng adapter prompt executor` full output, structural proxy only
+implementation:
+  files_changed: 1
+  unexpected_files_changed: 0
+verification:
+  verdict: PASS
+human_interventions: 1   # explicit --risk quick-fix override (see finding)
+state_path: "TRIAGED -> EXECUTING -> VERIFYING -> COMPLETED"   # skips PLANNED/REVIEWED/APPROVED entirely, as designed
+events_recorded:
+  - triaged
+  - state_changed(EXECUTING)
+  - state_changed(VERIFYING)
+  - verified(PASS)
+  - quick_fix
+  - state_changed(COMPLETED)
+finding: >
+  REAL DEFECT, not fixed per Phase 8's plan-scoped-fix rule (added to
+  benchmarks/BACKLOG.md instead): `eng workflow start "Increase the reconnect timeout
+  from 1000 ms to 1500 ms."` auto-triages to risk_level "feature", NOT "quick-fix".
+  Reproduced directly via `eng triage` (same input, same result). Root cause: Phase 5's
+  triage keyword list for quick-fix is {typo, rename, comment, formatting, "small
+  change"} — none matches "reconnect timeout"/numeric-value-tweak phrasing. This is the
+  exact scenario the Phase 8 instruction's own example schema used, expecting
+  `workflow: quick-fix`, and it did not resolve there automatically. The underlying
+  Quick Fix MECHANISM is sound (proven below via an explicit `--risk quick-fix`
+  override) — the gap is specifically in natural-language auto-classification.
+mechanism_proof: >
+  With `eng plan new bump-timeout --risk quick-fix` (bypassing triage), the plan reached
+  EXECUTING directly from TRIAGED (never PLANNED/REVIEWED/APPROVED), exactly one file
+  changed, verification PASS, and a `quick_fix` event was recorded automatically — the
+  Quick Fix workflow itself behaves exactly per Phase 5's design once correctly
+  classified.
+notes: >
+  Compare to Mode A (5 tool calls, no spec artifact, self-verified) and Mode B (full
+  3-file scaffold always, hand-authored proportionally minimal content). Mode C's
+  mechanism is the lightest of the three *when triage classifies correctly* — but for
+  this exact natural-language phrasing, it does not, without a Planner/user override.

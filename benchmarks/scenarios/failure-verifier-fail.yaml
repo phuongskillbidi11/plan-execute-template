@@ -1,0 +1,11 @@
+name: failure-verifier-fail
+category: failure-safety
+request: >
+  (state-machine probe — eng verify reports FAIL against a failing test)
+fixture: fixtures/quick-fix
+modes: [harness-v2]
+expected:
+  verification: FAIL
+  end_state_not: COMPLETED
+forbidden:
+  - state_reaches_completed

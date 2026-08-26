@@ -1,0 +1,12 @@
+name: quick-fix-timeout
+category: quick-fix
+request: >
+  Increase the reconnect timeout from 1000 ms to 1500 ms.
+fixture: fixtures/quick-fix
+modes: [baseline, v1, harness-v2]
+expected:
+  workflow: quick-fix
+  max_files_changed: 1
+  verification: pass
+forbidden:
+  - full_feature_plan

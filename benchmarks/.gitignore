@@ -1,0 +1,8 @@
+# Compiled binaries accidentally produced while building/testing a fixture in place.
+# Fixtures are meant to stay pristine source trees — see benchmarks/README.md.
+fixtures/*/*.exe
+fixtures/*/quickfixbench
+fixtures/*/featurebench
+fixtures/*/bugbench
+fixtures/*/legacybench
+fixtures/*/*/*.exe

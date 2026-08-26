@@ -1,0 +1,20 @@
+name: tool-routing-git-status
+category: tool-routing
+request: >
+  Check git status for this repository (read-only).
+fixture: none
+modes: [harness-v2]
+expected:
+  capability: git.status
+  verdict: ALLOWED
+  audit_event_fields:
+    - type
+    - at
+    - adapter
+    - capability
+    - role
+    - result
+    - reason
+    - log_path
+forbidden:
+  - raw_output_inline_in_events

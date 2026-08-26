@@ -1,0 +1,15 @@
+name: cross-domain-esp32-siemens-modbus
+category: cross-domain
+request: >
+  ESP32 reads Siemens S7-1200 over Modbus TCP
+fixture: none
+modes: [harness-v2]
+expected:
+  skills_selected_superset:
+    - esp32
+    - siemens-s7
+    - plc
+    - modbus
+    - tcp-ip
+forbidden:
+  - unrelated_domain_skills

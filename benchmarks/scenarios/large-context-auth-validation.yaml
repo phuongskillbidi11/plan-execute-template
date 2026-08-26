@@ -1,0 +1,11 @@
+name: large-context-auth-validation
+category: large-context
+request: >
+  Add input validation to the auth token check so an empty token is rejected.
+fixture: fixtures/large-context
+modes: [harness-v2]
+expected:
+  docs_selected: 1
+  only_relevant_package: auth
+forbidden:
+  - unrelated_package_context

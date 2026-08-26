@@ -1,0 +1,38 @@
+scenario: bug-lastn-off-by-one
+mode: harness-v2
+workflow_selected: bug   # risk_level bug, spec_first (project default), review required
+context:
+  skills_selected:
+    - name: karpathy-guidelines
+      reason: explicitly enabled
+    - name: engineering/debugging
+      reason: matched request text (triggers include "debug")
+  skills: 2
+implementation:
+  files_changed: 1   # lastn.go
+  unexpected_files_changed: 0
+verification:
+  verdict: PASS
+  before_fix: FAIL   # confirmed via `go test ./...` before any change: "got [2 3 4 5], want [3 4 5]"
+  after_fix: PASS
+state_path: >
+  TRIAGED -> NEEDS_SPEC_APPROVAL -> SPEC_APPROVED -> PLANNED -> REVIEWED -> APPROVED ->
+  EXECUTING -> VERIFYING -> COMPLETED
+human_interventions: 2   # spec approval, review verdict
+notes: >
+  engineering/debugging was correctly selected for a request containing "debug" (its
+  triggers list includes exactly that word) alongside the always-explicit
+  karpathy-guidelines. Applying the lesson from the feature-csv-export run, the actual
+  code fix was made only after the plan reached EXECUTING — no drift this time. One
+  authoring shortcut taken for this lower-priority (Mode-C-only) category: the
+  individual task titles in tasks.md were left as template placeholders
+  ("[Short imperative title]") since only the mechanical completion-checklist marking
+  affects what eng workflow advance gates on — a real dogfooding session would fill
+  these in for human readability, which this benchmark run did not bother doing.
+  Mode A/B discussion (not run, per Phase 8 spec.md Decision 4 — this category's claim
+  is internal to the harness, not a three-way comparison): V1 has no skill routing at
+  all, so "was the debugging skill selected" has no V1 analogue to compare against; a
+  baseline agent would presumably also "debug" the function without any named-skill
+  concept, since general debugging competence isn't something V2's skill routing adds
+  to the model — what it adds is a *documented, inspectable methodology* the harness
+  can point to and audit, not a capability the base model lacked.

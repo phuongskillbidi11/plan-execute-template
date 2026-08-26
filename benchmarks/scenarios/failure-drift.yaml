@@ -1,0 +1,10 @@
+name: failure-drift
+category: failure-safety
+request: >
+  (state-machine probe — a tracked file changes outside write_scope after approval)
+fixture: fixtures/quick-fix
+modes: [harness-v2]
+expected:
+  end_state: NEEDS_REPLAN
+forbidden:
+  - silent_continuation_past_drift

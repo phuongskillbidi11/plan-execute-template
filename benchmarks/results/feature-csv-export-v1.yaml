@@ -1,0 +1,30 @@
+scenario: feature-csv-export
+mode: v1
+workflow_selected: none   # V1 has one path; no spec-approval gate distinct from implementation
+context:
+  skills: n/a
+  docs: n/a
+  files: 1
+artifacts_scaffolded:
+  - spec.md
+  - tasks.md
+  - tests.md
+spec_approval_gate: none   # structural difference from V2, not a defect — see notes
+implementation:
+  files_changed: 1
+  unexpected_files_changed: 0
+verification:
+  verdict: PASS
+  method: "manual: go build ./... && go run . export/list, output inspected (plan-executor.sh
+    test itself hits the same local python3-PATH quirk noted in the quick-fix-timeout-v1
+    result; not re-explained here)"
+human_interventions: 1   # this session authored spec.md/tasks.md/tests.md by hand, acting as Planner
+manual_low_level_steps: 5   # plan-executor.sh new, hand-write 3 files, implement, mark tasks, verify
+notes: >
+  V1 has no mechanism distinguishing "requirements approved" from "implementation
+  started" — the Planner writes spec.md and the Executor can begin immediately after,
+  with no automated stop analogous to harness-v2's NEEDS_SPEC_APPROVAL gate. In this
+  run (this session acting as both roles), nothing prevented moving straight from
+  spec.md to code — the separation is a documented convention (CLAUDE.md's Planner
+  role), not a mechanically enforced one. This is the direct structural counterpart to
+  the harness-v2 result's core validated claim.

@@ -1,0 +1,24 @@
+scenario: tool-routing-git-status
+mode: harness-v2
+capability: git.status
+adapter: git
+verdict: ALLOWED
+reason: "read capability, no explicit policy — default-open for READ"
+audit_event_fields:
+  - type
+  - at
+  - adapter
+  - capability
+  - log_path
+  - reason
+  - result
+  - role
+audit_event_field_count: 8
+raw_output_inline: false   # confirmed — event contains only log_path, no command output
+implementation:
+  files_changed: 0
+notes: >
+  Real `git status` output was written to `.agent/logs/tool-git-<timestamp>.log`
+  (reused Phase 4/5's writeFullLog); the audit event referenced it by path only,
+  matching Phase 7's own design exactly. No capability beyond the exact eight documented
+  fields appeared in the event.

@@ -1,0 +1,12 @@
+name: feature-csv-export
+category: feature
+request: >
+  Add an export command that prints all records as CSV (id,name) to stdout.
+fixture: fixtures/feature
+modes: [baseline, v1, harness-v2]
+expected:
+  workflow: spec_first
+  spec_approval_before_tasks: true
+  verification: pass
+forbidden:
+  - tasks_before_spec_approval

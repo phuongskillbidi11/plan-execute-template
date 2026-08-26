@@ -1,0 +1,28 @@
+scenario: cross-domain-esp32-siemens-modbus
+mode: harness-v2
+context:
+  skills_selected:
+    - name: karpathy-guidelines
+      reason: explicitly enabled
+    - name: siemens-s7
+      reason: matched request text
+    - name: modbus
+      reason: matched request text
+    - name: esp32
+      reason: matched request text
+    - name: tcp-ip
+      reason: matched request text
+    - name: plc
+      reason: required by automation/siemens-s7
+  skills: 6
+  skills_omitted: 5
+verification:
+  matches_expected_superset: true   # {esp32, siemens-s7, plc, modbus, tcp-ip} all present
+notes: >
+  Reproduces Phase 6's own committed router eval (harness/evals/embedded/
+  esp32-siemens-modbus.yaml, exercised automatically by
+  TestRouterEvalScenarios) as a durable Phase 8 benchmark artifact. `plc` is
+  correctly pulled in only via `siemens-s7`'s hard `requires:` dependency, not a direct
+  text match — proving Phase 6's dependency-expansion mechanism, not just its keyword
+  matching, on the exact example named in the Phase 6 instruction. No unrelated-domain
+  skill (software/cpp, devops/docker, it/linux) was selected.

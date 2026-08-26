@@ -1,0 +1,11 @@
+name: bug-lastn-off-by-one
+category: bug
+request: >
+  LastN is returning the wrong elements — debug and fix it.
+fixture: fixtures/bug
+modes: [harness-v2]
+expected:
+  skill_selected: engineering/debugging
+  verification: pass
+forbidden:
+  - unrelated_file_changes

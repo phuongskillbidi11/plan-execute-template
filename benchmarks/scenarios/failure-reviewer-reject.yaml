@@ -1,0 +1,10 @@
+name: failure-reviewer-reject
+category: failure-safety
+request: >
+  (state-machine probe — Plan Reviewer issues a REJECT verdict)
+fixture: fixtures/quick-fix
+modes: [harness-v2]
+expected:
+  end_state: NEEDS_REPLAN
+forbidden:
+  - state_reaches_approved
