@@ -90,23 +90,20 @@ live in **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)**.
 
 ## Current phase / maturity
 
-**Internal dogfooding / early team use.** Not production-hardened. Phase 8 ran a real,
+**Internal dogfooding / team-usable beta.** Not production-hardened. Phase 8 ran a real,
 evidence-based benchmark suite (`benchmarks/`) comparing this harness against a baseline
-unharnessed agent and against the original V1 template across 8 categories. Result: **7 of 10
-scorecard dimensions rated Strong, 3 rated Adequate, 0 Weak, 0 blocking (P0) issues** — see
-[`benchmarks/SCORECARD.md`](benchmarks/SCORECARD.md). The benchmark's own decision:
-`READY_TO_EXPAND`, with three real, documented refinement items outstanding (not silently
-fixed — tracked in [`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md)):
+unharnessed agent and against the original V1 template across 8 categories, scoring 7 of 10
+scorecard dimensions Strong, 3 Adequate, 0 Weak, 0 blocking (P0) issues, and surfacing three
+real refinement items. **Phase 9 fixed all three**, plus two more real defects found during
+subsequent real-world dogfooding (a skill-routing false positive on non-PLC serial/RS485
+projects, and a global/local duplicate-skill resolution bug) — see
+[`benchmarks/SCORECARD.md`](benchmarks/SCORECARD.md) for the Phase 8 baseline and
+[`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md) for what Phase 9 closed vs. what's still open.
+Phase 9 also added 9 new skills (C#/.NET desktop, Qt/CMake, serial/protocol engineering,
+embedded Linux, reverse engineering) for the real project types the harness is now used on —
+see [Skill authoring](#skill-authoring) below.
 
-- **Quick Fix triage misclassification** — plausible real-world phrasing routes to the full
-  feature workflow instead of Quick Fix (workaround: `eng plan new --risk quick-fix` explicitly)
-- **Doc-context over-matching** — `eng context project` selected 4 of 6 doc sections where only
-  1 was relevant in the one case tested, vs. 0 false positives for skill routing on the same
-  request
-- **Dual task-completion conventions** — `tasks.md`'s per-task `Status:` marker and its bottom
-  "Completion checklist" are unsynchronized; only the bottom one gates `eng workflow advance`
-
-See [Known limitations](#known-limitations) for the short version, and
+See [Known limitations](#known-limitations) for what's still genuinely open, and
 [`benchmarks/README.md`](benchmarks/README.md) for how to reproduce any of this yourself.
 
 ---
@@ -323,13 +320,14 @@ never a fabricated `tokens:` field. Read:
 
 ## Known limitations
 
-- **Quick Fix triage misclassifies some plausible phrasing** (numeric/parameter-tweak requests)
-  — workaround: scaffold explicitly with `--risk quick-fix`. [`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md) P1-1.
-- **Doc-context routing over-matches relative to skill routing** — measured 67% false-positive
-  rate on one large-context benchmark case. [`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md) P1-2.
-- **`tasks.md` has two unsynchronized completion conventions** (per-task `Status:` marker vs.
-  the bottom checklist that actually gates `eng workflow advance`) — mark both.
-  [`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md) P2-1.
+**Resolved in Phase 9** (kept here only as a pointer, not re-explained — see
+[`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md) for the fix evidence): Quick Fix triage
+misclassification of parameter-tweak phrasing, doc-context over-matching relative to skill
+routing, the dual `tasks.md` completion-convention confusion, a skill-routing false positive on
+non-PLC serial/RS485 projects, and a global/local duplicate-skill resolution bug.
+
+Still open:
+
 - **No live MCP JSON-RPC transport** — the one MCP-style adapter shipped (`docs-search`) is a
   deterministic local mock, not a real server connection.
 - **No tool installer or marketplace** — adapters are added by implementing
@@ -341,12 +339,22 @@ never a fabricated `tokens:` field. Read:
   precedence tier, not a versioned dependency resolver.
 - **No `eng migrate` command** — not needed today (see Legacy compatibility), but also not
   built; a legacy project's `mode: hybrid` is the only "upgrade" step that exists.
+- **A request relevant to more skills than the context budget allows still gets budget-cut** —
+  an inherent, expected consequence of a bounded skill budget (`max_skills`, default 5, which
+  counts explicitly-enabled skills against it too), not a routing defect. See
+  [`benchmarks/results/qt-cmake-embedded-linux-harness-v2.yaml`](benchmarks/results/qt-cmake-embedded-linux-harness-v2.yaml)
+  for a concrete case.
+- **`automation/plc`'s bare `automation` tag is a latent P2-2-class risk, not yet fixed** —
+  observed alongside the `embedded/esp32` defect Phase 9 did fix, but nothing in Phase 9's own
+  scenarios exercises it, so it's documented rather than fixed speculatively.
+  [`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md).
 
 ## Roadmap
 
-See [`ROADMAP.md`](ROADMAP.md). Short version: **Core Refinement** (fix the Phase 8 P1/P2
-backlog items above) → continued real-world dogfooding → then further MCP/skill-distribution
-expansion, only once the refinement backlog is addressed.
+See [`ROADMAP.md`](ROADMAP.md). Short version: continued real-world dogfooding on the newly
+covered project types (C#/.NET, Qt/CMake, embedded Linux) → address the two remaining latent
+routing risks above if real usage shows they matter → then further MCP/skill-distribution
+expansion.
 
 ## Backward compatibility promise
 

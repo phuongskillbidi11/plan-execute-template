@@ -1,0 +1,29 @@
+scenario: csharp-winforms-rs485
+mode: harness-v2
+phase: 9
+context:
+  skills_selected:
+    - name: karpathy-guidelines
+      reason: explicitly enabled
+    - name: serial-communications
+      reason: matched request text
+    - name: csharp-dotnet
+      reason: matched request text
+    - name: winforms
+      reason: matched request text
+    - name: protocol-engineering
+      reason: recommended by software/serial-communications
+  skills: 5
+  forbidden_present: []
+verification:
+  matches_expected: true
+  forbidden_absent: true
+notes: >
+  Real `eng context skills` output against benchmarks/fixtures/csharp-winforms-rfid (a real
+  eng init-ed .csproj/WinForms project, stack correctly detected as "csharp"). All three
+  expected new skills present under the real default budget (5), plus
+  engineering/protocol-engineering pulled in via serial-communications' own recommends: — no
+  budget cut needed since only 4 real Tier-B-strength matches exist for this request. No
+  automation/PLC skill present. This is the concrete after-state for the same defect documented
+  in benchmarks/results/skill-routing-rs485-not-plc.yaml, now against the purpose-built fixture
+  and the new skill taxonomy rather than an empty result.

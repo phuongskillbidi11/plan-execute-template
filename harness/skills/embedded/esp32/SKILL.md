@@ -3,7 +3,7 @@ name: esp32
 domain: embedded
 level: technology
 description: ESP32-specific constraints — dual-core scheduling, watchdogs, flash wear, and peripheral pin conflicts — before assuming general embedded advice applies.
-tags: [esp32, embedded, microcontroller]
+tags: [esp32, microcontroller]
 triggers: [esp32, "esp-32", esp-idf, arduino]
 version: "1.0.0"
 requires: []

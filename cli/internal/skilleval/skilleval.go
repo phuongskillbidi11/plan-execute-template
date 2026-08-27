@@ -17,7 +17,12 @@ type Scenario struct {
 	Name           string   `yaml:"name"`
 	Request        string   `yaml:"request"`
 	ExpectedSkills []string `yaml:"expected_skills"`
-	Notes          string   `yaml:"notes,omitempty"`
+	// ForbiddenSkills is optional — skills that must NOT be selected for
+	// this request. Added in Phase 9 for the RS485-must-not-select-PLC
+	// regression case; omitempty keeps every pre-Phase-9 scenario file
+	// valid unchanged.
+	ForbiddenSkills []string `yaml:"forbidden_skills,omitempty"`
+	Notes           string   `yaml:"notes,omitempty"`
 }
 
 // LoadScenarios walks root for *.yaml files and parses each as one

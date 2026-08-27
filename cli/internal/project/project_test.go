@@ -67,11 +67,75 @@ func TestDetectModeResultBroken(t *testing.T) {
 	}
 }
 
-func TestEffectiveWorkflowDefaultsAllTrue(t *testing.T) {
-	cfg := &Config{}
-	w := cfg.EffectiveWorkflow()
-	if !w.Triage || !w.PlanReview || !w.Verifier {
-		t.Fatalf("expected all-true default, got %+v", w)
+// TestWorkflowFieldsDefaultToEnabledWhenOmitted covers the "omitted
+// workflow block" case of Phase 9 spec.md P1-4's four required cases: a
+// Config with no workflow: block at all (every project before Phase 9, and
+// any field a project's workflow: block doesn't mention) resolves each
+// field to enabled — unchanged behavior from before this phase.
+func TestWorkflowFieldsDefaultToEnabledWhenOmitted(t *testing.T) {
+	w := Workflow{}
+	if !w.TriageEnabled() || !w.PlanReviewEnabled() || !w.VerifierEnabled() {
+		t.Fatalf("expected all three to default enabled when unset, got triage=%v plan_review=%v verifier=%v",
+			w.TriageEnabled(), w.PlanReviewEnabled(), w.VerifierEnabled())
+	}
+}
+
+func boolPtr(b bool) *bool { return &b }
+
+// TestWorkflowFieldsAllExplicitTrue covers case 2/4: every field explicitly
+// true resolves true.
+func TestWorkflowFieldsAllExplicitTrue(t *testing.T) {
+	w := Workflow{Triage: boolPtr(true), PlanReview: boolPtr(true), Verifier: boolPtr(true)}
+	if !w.TriageEnabled() || !w.PlanReviewEnabled() || !w.VerifierEnabled() {
+		t.Fatalf("expected all three explicit-true to resolve true, got %+v", w)
+	}
+}
+
+// TestWorkflowFieldsMixedExplicit covers case 3/4: each field resolves its
+// own literal value independently, regardless of the others.
+func TestWorkflowFieldsMixedExplicit(t *testing.T) {
+	w := Workflow{Triage: boolPtr(true), PlanReview: boolPtr(false), Verifier: boolPtr(true)}
+	if !w.TriageEnabled() {
+		t.Fatal("expected triage=true to resolve true")
+	}
+	if w.PlanReviewEnabled() {
+		t.Fatal("expected plan_review=false to resolve false")
+	}
+	if !w.VerifierEnabled() {
+		t.Fatal("expected verifier=true to resolve true")
+	}
+}
+
+// TestWorkflowFieldsAllExplicitFalseStaysFalse is the direct regression
+// test for the P1-4 bug itself: before this phase, {false,false,false}
+// (every field explicitly set) was indistinguishable from an omitted
+// workflow: block and silently resolved to all-enabled via the old
+// EffectiveWorkflow()/enabled() group heuristic. It must now stay false.
+func TestWorkflowFieldsAllExplicitFalseStaysFalse(t *testing.T) {
+	w := Workflow{Triage: boolPtr(false), PlanReview: boolPtr(false), Verifier: boolPtr(false)}
+	if w.TriageEnabled() || w.PlanReviewEnabled() || w.VerifierEnabled() {
+		t.Fatalf("expected all-explicit-false to resolve all false, got triage=%v plan_review=%v verifier=%v",
+			w.TriageEnabled(), w.PlanReviewEnabled(), w.VerifierEnabled())
+	}
+}
+
+// TestWorkflowFieldsRoundTripThroughYAML confirms explicit false survives a
+// real Save/Load cycle (omitempty on a *bool omits only nil, never
+// *ptr==false — the same guarantee RequireSpecApproval already relies on).
+func TestWorkflowFieldsRoundTripThroughYAML(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &Config{ProjectName: "x", Mode: "modern", Workflow: Workflow{
+		Triage: boolPtr(false), PlanReview: boolPtr(false), Verifier: boolPtr(false),
+	}}
+	if err := Save(dir, cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Workflow.TriageEnabled() || got.Workflow.PlanReviewEnabled() || got.Workflow.VerifierEnabled() {
+		t.Fatalf("expected explicit false to survive a save/load round trip, got %+v", got.Workflow)
 	}
 }
 

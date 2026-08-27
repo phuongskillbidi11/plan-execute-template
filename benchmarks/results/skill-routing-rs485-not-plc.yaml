@@ -1,0 +1,37 @@
+scenario: skill-routing-rs485-not-plc
+mode: harness-v2
+phase: 9
+fix: P2-2
+request: "Maintain a C# WinForms UHF RFID configuration tool using RS485 and USB-HID binary protocol framing."
+before:
+  command: eng context skills "<request above>"
+  selected: [modbus, siemens-s7, plc, debugging, linux, tcp-ip]
+  root_causes:
+    - "modbus matched via a single generic description-word hit on \"framing\""
+    - "siemens-s7 matched via a single generic description-word hit on \"protocol\""
+    - "plc was force-included via siemens-s7's requires: [automation/plc], despite plc itself never matching anything"
+    - "tcp-ip was pulled in via modbus's recommends: [networking/tcp-ip]"
+    - "debugging matched via a pure substring bug: \"form\" (from its description \"...form a hypothesis...\") is a substring of the request word \"WinForms\", with no word-boundary check"
+after:
+  command: eng context skills "<request above>"
+  selected: []
+  notes: >
+    Correctly selects nothing from the current 11 shipped skills — none of them legitimately
+    concern a C#/RS485/USB-HID project. Task 7/8 of this phase add software/csharp-dotnet,
+    software/winforms, and software/serial-communications, re-verified separately in
+    benchmarks/results/csharp-winforms-rs485-harness-v2.yaml to select correctly once those
+    exist.
+fix_summary: >
+  cli/internal/skillmatch/skillmatch.go: word-boundary (tokenized) phrase matching instead of
+  raw substring containment (kills the "form"/"WinForms" class); weighted scoring
+  (TagTriggerWeight=3, DescriptionWordWeight=1) with a MinMatchScore=2 inclusion threshold
+  (kills the single-generic-word "framing"/"protocol" class) — see docs/skills.md and Phase 9
+  DECISION_LOG.md Decision 2. Also fixed a "C++"/"C#" token collision (both degenerate to a
+  bare "c" token once punctuation is stripped without normalization) discovered during this
+  exact reproduction.
+verification: >
+  cli/internal/skillmatch/skillmatch_test.go — TestScoreIgnoresSubstringInsideUnrelatedWord,
+  TestSingleDescriptionWordAloneDoesNotClearThreshold, TestSingleTagOrTriggerAloneClearsThreshold,
+  TestScoreDoesNotDoubleCountRepeatedDescriptionWord, TestScoreDistinguishesCSharpFromCpp — all
+  PASS. go test ./... -run TestRouterEvalScenarios -v — all 3 pre-existing scenarios still PASS
+  unchanged.

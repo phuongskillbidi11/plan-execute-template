@@ -2,47 +2,40 @@
 
 Phases 1–7 built the Global Engineering Harness (global install, plan lifecycle state machine,
 context routing, natural-language runtime, multi-domain skill ecosystem, audited tool/MCP
-runtime). Phase 8 validated it with a real benchmark suite instead of assuming it worked. See
-[`README.md`](README.md) for what's implemented today and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-for how it fits together. The detailed design record for each phase lives in its own
-`.plans/YYYY-MM-DD-v2-harness-*/spec.md` and `DECISION_LOG.md` — this file stays a short,
-current-reality summary, not a phase-by-phase archive.
+runtime). Phase 8 validated it with a real benchmark suite instead of assuming it worked. Phase
+9 fixed everything Phase 8 found, plus two more real defects found via subsequent dogfooding,
+and added real-world skill coverage (C#/.NET desktop, Qt/CMake, serial/protocol engineering,
+embedded Linux, reverse engineering). See [`README.md`](README.md) for what's implemented today
+and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how it fits together. The detailed design
+record for each phase lives in its own `.plans/YYYY-MM-DD-v2-harness-*/spec.md` and
+`DECISION_LOG.md` — this file stays a short, current-reality summary, not a phase-by-phase
+archive.
 
 ## Where things stand
 
-**Internal dogfooding / early team use.** Phase 8's scorecard: 7/10 dimensions Strong, 3/10
-Adequate, 0/10 Weak, 0 P0 (blocking) backlog items. Decision: `READY_TO_EXPAND` — see
-[`benchmarks/SCORECARD.md`](benchmarks/SCORECARD.md).
+**Internal dogfooding / team-usable beta.** Phase 8's scorecard: 7/10 dimensions Strong, 3/10
+Adequate, 0/10 Weak, 0 P0 (blocking) backlog items — decision `READY_TO_EXPAND` (see
+[`benchmarks/SCORECARD.md`](benchmarks/SCORECARD.md)). Phase 9 closed all three Phase 8
+refinement items (Quick Fix triage misclassification, doc-context over-matching, the dual
+`tasks.md` completion-convention confusion) plus two more found during real dogfooding
+(RS485-implies-PLC skill-routing false positive, global/local duplicate skill resolution) — see
+[`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md) for the full evidence trail on each.
 
-## Now: Core Refinement
+## Now: continued real-world dogfooding
 
-Address the real, benchmark-confirmed gaps in [`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md)
-before adding new surface area:
-
-- **P1 — Quick Fix triage misclassification.** Broaden the triage keyword list (or add a
-  size-based heuristic) so plausible numeric/parameter-tweak requests route to Quick Fix
-  without a manual `--risk quick-fix` override.
-- **P1 — Doc-context over-matching.** Bring `internal/docsearch.Match`'s doc-section routing
-  closer to `internal/skillmatch.Score`'s weighted model instead of its current apparent
-  simple word-overlap approach.
-- **P2 — Dual `tasks.md` completion conventions.** Either drop the per-task `Status:` marker in
-  favor of the bottom checklist alone, or make `tasksComplete()` recognize both — and make the
-  "unchecked items" message name the specific blocking line(s).
-
-Each of these needs its own scoped plan under `.plans/` with a regression test proving the fix,
-followed by a re-run of the relevant benchmark scenario to confirm it actually closed the gap —
-not just a code change asserted to fix it.
-
-## Next: continued real-world dogfooding
-
-Use the harness on real, non-benchmark work across more than one domain before expanding scope
-further. Feed anything that surfaces — a misrouted skill, an approval-friction pattern, a
-context bundle that's too large in practice — back into `benchmarks/BACKLOG.md` the same way
-Phase 8 did, with evidence, not assertion.
+Use the harness on real, non-benchmark work across the newly-covered project types (C#/.NET
+desktop, Qt/CMake, embedded Linux) and any others that come up, before expanding scope further.
+Feed anything that surfaces — a misrouted skill, an approval-friction pattern, a context bundle
+that's too large in practice — back into `benchmarks/BACKLOG.md` the same way Phases 8–9 did,
+with evidence, not assertion. Two known, low-priority latent risks from Phase 9's own dogfooding
+are already tracked there rather than fixed speculatively: `automation/plc`'s bare `automation`
+tag (same class of bug as the RS485 fix, but nothing currently exercises it), and the inherent
+budget-vs-breadth tension when a single request genuinely concerns more skills than the default
+budget allows.
 
 ## Later: MCP / skill distribution expansion
 
-Only after the refinement backlog above is addressed:
+Only after real-world dogfooding above has run for a while with no new P0/P1-class findings:
 
 - A real MCP JSON-RPC transport (today's one MCP-style adapter, `docs-search`, is a
   deterministic local mock — see [`docs/tools.md`](docs/tools.md)).

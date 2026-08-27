@@ -74,8 +74,15 @@ func TestRecommendsDroppedWhenBudgetExhausted(t *testing.T) {
 }
 
 func TestRecommendsIncludedWhenBudgetAllows(t *testing.T) {
+	// "main" needs a real curated match (a Tag), not just its own name
+	// echoed back in a synthetic Description — a lone description-word
+	// match no longer clears MinMatchScore on its own (Phase 9 spec.md
+	// P2-2: a single generic-prose-word hit is deliberately not treated as
+	// a strong match). See Phase 9 DECISION_LOG.md Decision 4.
+	main := mk("main", "x", nil, []string{"x/extra"})
+	main.Tags = []string{"main"}
 	all := []skills.Skill{
-		mk("main", "x", nil, []string{"x/extra"}),
+		main,
 		mk("extra", "x", nil, nil),
 	}
 	sel, err := Route(all, "main", nil, nil, 5)

@@ -110,3 +110,27 @@ and a positional argument must do the same — plain `flagset.Parse(args)` is on
 flags are guaranteed to come first, which no user reliably does by habit.
 
 **From:** `.plans/2026-08-24-v2-harness-phase3/`
+
+### `eng start` launching an agent whose PATH never actually had the harness `bin/` directory
+
+**Trap:** `eng install --add-to-path`'s Windows path uses `setx`, which only affects *new*
+terminal sessions — a session already open when `--add-to-path` (or the printed manual `setx`
+line) runs keeps its old PATH for the rest of that session. Running `eng start` from that same
+stale session (especially via the binary's full path, e.g.
+`C:\Users\<you>\.engineering-harness\bin\eng.exe start`, which bypasses PATH lookup entirely and
+so never itself proves PATH is correct) launches `claude` with that same stale, harness-less
+PATH inherited.
+
+**Symptom:** Inside the launched Claude Code session, running `eng doctor` from the Bash tool
+fails with `bash: eng: command not found` — easy to misread as "the harness isn't installed,"
+when the harness is installed fine and only the PATH propagation was stale.
+
+**Fix / rule:** `eng start` (Phase 9 onward) no longer relies on the inherited PATH being
+correct — it explicitly prepends both the running binary's own directory and the installed
+`bin/` directory to the launched session's `PATH` (via `buildChildEnv` in `cli/start_cmd.go`),
+and sets `ENG_HOME`/`ENG_PROJECT_ROOT`/`ENG_VERSION` as explicit environment variables. A
+session that still can't resolve `eng` in some nested shell it spawns itself (e.g. that shell's
+own profile script resets `PATH`) should fall back to `"$ENG_HOME/bin/eng"` — see
+`harness/core/runtime/METHOD.md`.
+
+**From:** `.plans/2026-08-26-v2-harness-phase9-core-refinement/`

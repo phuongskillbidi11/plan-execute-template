@@ -1,0 +1,44 @@
+scenario: skill-dedup-legacy-global
+mode: harness-v2
+phase: 9
+fix: P2-3
+fixture: benchmarks/fixtures/legacy-duplicate-skill
+before:
+  command: eng skills list (grep karpathy)
+  result:
+    - "karpathy-guidelines [global] domain=engineering level=-  ..."
+    - "karpathy-guidelines [local]  domain=unknown     level=-  ..."
+  notes: two entries for the same conceptual skill.
+after:
+  command: eng skills list (grep karpathy)
+  result:
+    - "karpathy-guidelines [local] domain=unknown level=- ..."
+  notes: exactly one entry, sourced from the higher-precedence (local) tier, per Phase 9
+    spec.md's acceptance criterion.
+validate_output:
+  command: eng skills validate
+  result: "11 skill(s) discovered, 0 error(s), 2 warning(s)"
+  warnings:
+    - "karpathy-guidelines: shadowed — this file under <global skills root> was resolved as a
+      duplicate of a higher-precedence skill sharing its bare name"
+    - "karpathy-guidelines: legacy skill — no frontmatter metadata"
+  notes: >
+    Both are SeverityWarning, not SeverityError — exit code stays 0, matching every other
+    legacy-skill warning already in the codebase. The first warning is the new "explain which
+    source won" observability added to skillvalidate.Validate.
+real_world_confirmation: >
+  Re-running the same eng skills validate command against this repository's OWN root (not the
+  synthetic fixture) surfaced the identical, real, pre-existing instance of this bug: this
+  repo's own V1-era skills/karpathy-guidelines/ (legacy heading convention) was shadowing/being-
+  shadowed-by the installed harness/skills/engineering/karpathy-guidelines. Before the fix, `eng
+  skills validate` at the repo root reported 13 discovered skills (12 real + 1 accidental
+  duplicate); after the fix, 11 (0 errors, 2 warnings — the same shadow + legacy pair). This
+  was not constructed for the benchmark — it was already present in this session's own working
+  tree.
+verification: >
+  cli/internal/skills/skills_test.go — TestResolveCollapsesLegacyDuplicateOfGlobalSkill,
+  TestResolveDoesNotCollapseDistinctQualifiedSkillsSharingABareName,
+  TestResolveWithPrivateCollapsePrecedenceLocalWinsOverPrivateLegacy — all PASS, alongside every
+  pre-existing skills/skillvalidate test (including TestResolveQualifiesByDomainToAvoidCollisions
+  and TestValidateSameBareNameDifferentDomainsDoesNotWarnAsDuplicate, the direct guards against
+  over-collapsing legitimate cross-domain same-bare-name skills).

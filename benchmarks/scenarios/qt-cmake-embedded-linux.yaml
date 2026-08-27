@@ -1,0 +1,12 @@
+name: qt-cmake-embedded-linux
+category: cross-domain
+request: >
+  Build this Qt application for an ARM embedded Linux target using CMake.
+fixture: fixtures/qt-cmake-embedded-linux
+modes: [harness-v2]
+expected:
+  skills_include: [qt, cmake, embedded-linux, cross-compilation, linux]
+forbidden:
+  - esp32
+  - plc
+  - siemens-s7

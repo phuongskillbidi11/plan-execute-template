@@ -142,9 +142,77 @@ func ResolveWithPrivate(globalRoot, privateRoot, localRoot string) ([]Skill, err
 		}
 	}
 
+	collapseLegacyDuplicates(merged)
+
 	out := make([]Skill, 0, len(merged))
 	for _, s := range merged {
 		out = append(out, s)
 	}
 	return out, nil
+}
+
+// isLegacy reports whether s came from a frontmatter-less SKILL.md (the
+// "# Skill: name" / "## Purpose" fallback convention) — its Domain is
+// always "" or "unknown" in that case, which is also what makes its
+// QualifiedName() collapse to its bare Name.
+func isLegacy(s Skill) bool {
+	return s.Domain == "" || s.Domain == "unknown"
+}
+
+// bareName strips a QualifiedName's domain prefix, if any.
+func bareName(name string) string {
+	if idx := strings.LastIndex(name, "/"); idx >= 0 {
+		return name[idx+1:]
+	}
+	return name
+}
+
+// collapseLegacyDuplicates removes a legacy (frontmatter-less) skill
+// whenever it shares a bare name with an already-merged qualified skill —
+// the same conceptual skill re-declared without frontmatter (e.g. a
+// project-local leftover from before it adopted the harness), not a
+// deliberate cross-domain reuse of a short name. A group made entirely of
+// qualified skills (real, distinct-domain skills that happen to share a
+// bare name — e.g. a future networking/modbus alongside automation/modbus,
+// per docs/skills.md) is left untouched: collapsing that would be a real
+// regression, not a fix. Within a collapsed group, the highest-precedence
+// tier survives (local > private > global — the same precedence the
+// per-key merge above already applies via map overwrite order). See Phase
+// 9 spec.md P2-3 and DECISION_LOG.md Decision 6.
+func collapseLegacyDuplicates(merged map[string]Skill) {
+	tierRank := map[string]int{"global": 0, "private": 1, "local": 2}
+
+	byBare := map[string][]string{}
+	for qn, s := range merged {
+		byBare[bareName(s.Name)] = append(byBare[bareName(s.Name)], qn)
+	}
+
+	for _, qns := range byBare {
+		if len(qns) < 2 {
+			continue
+		}
+		hasLegacy, hasQualified := false, false
+		for _, qn := range qns {
+			if isLegacy(merged[qn]) {
+				hasLegacy = true
+			} else {
+				hasQualified = true
+			}
+		}
+		if !hasLegacy || !hasQualified {
+			continue // all-qualified: genuinely distinct cross-domain skills — never collapse
+		}
+
+		best := qns[0]
+		for _, qn := range qns[1:] {
+			if tierRank[merged[qn].Source] > tierRank[merged[best].Source] {
+				best = qn
+			}
+		}
+		for _, qn := range qns {
+			if qn != best {
+				delete(merged, qn)
+			}
+		}
+	}
 }

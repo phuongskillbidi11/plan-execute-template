@@ -46,6 +46,11 @@ func TestRouterEvalScenarios(t *testing.T) {
 					t.Errorf("scenario %q: expected %q to be selected, got %v", sc.Name, want, skillNames(sel.Skills))
 				}
 			}
+			for _, forbidden := range sc.ForbiddenSkills {
+				if got[forbidden] {
+					t.Errorf("scenario %q: %q must NOT be selected, got %v", sc.Name, forbidden, skillNames(sel.Skills))
+				}
+			}
 		})
 	}
 }

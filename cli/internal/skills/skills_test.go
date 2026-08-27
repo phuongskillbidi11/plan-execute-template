@@ -17,6 +17,13 @@ func writeSkill(t *testing.T, dir, name, content string) {
 	}
 }
 
+// writeLegacySkill writes a frontmatter-less SKILL.md using the legacy
+// "# Skill: name" / "## Purpose" convention — parses with Domain "unknown".
+func writeLegacySkill(t *testing.T, dir, name string) {
+	t.Helper()
+	writeSkill(t, dir, name, "# Skill: "+name+"\n\n## Purpose\n\nLegacy skill body.\n")
+}
+
 func TestParseFrontmatter(t *testing.T) {
 	dir := t.TempDir()
 	writeSkill(t, dir, "modbus", "---\nname: modbus\ndomain: automation\ndescription: Modbus knowledge\n---\n\nbody\n")
@@ -120,5 +127,72 @@ func TestResolveWithPrivatePrecedenceGlobalLtPrivateLtLocal(t *testing.T) {
 	}
 	if len(merged) != 1 || merged[0].Description != "local" {
 		t.Fatalf("expected local to override private, got %+v", merged)
+	}
+}
+
+// TestResolveCollapsesLegacyDuplicateOfGlobalSkill is the direct regression
+// test for the real Phase 9 P2-3 defect: a global engineering/
+// karpathy-guidelines and a project-local legacy karpathy-guidelines
+// (identical conceptual skill, no frontmatter) used to both resolve as
+// distinct entries, since QualifiedName() only collapses skills with an
+// exactly matching key and a legacy skill's key is its bare Name, not
+// "engineering/karpathy-guidelines".
+func TestResolveCollapsesLegacyDuplicateOfGlobalSkill(t *testing.T) {
+	g, l := t.TempDir(), t.TempDir()
+	writeSkill(t, filepath.Join(g, "engineering"), "karpathy-guidelines",
+		"---\nname: karpathy-guidelines\ndomain: engineering\ndescription: global karpathy\n---\n")
+	writeLegacySkill(t, l, "karpathy-guidelines")
+
+	merged, err := Resolve(g, l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(merged) != 1 {
+		t.Fatalf("expected the legacy duplicate to collapse into one entry, got %d: %+v", len(merged), merged)
+	}
+	if merged[0].Source != "local" {
+		t.Fatalf("expected the higher-precedence (local) tier to win, got source %q", merged[0].Source)
+	}
+}
+
+// TestResolveDoesNotCollapseDistinctQualifiedSkillsSharingABareName is the
+// explicit guard for Decision 6: two real, distinct-domain skills that
+// happen to share a bare name (both have real frontmatter, neither is
+// legacy) must never be collapsed — automation/modbus vs. a future
+// networking/modbus, per docs/skills.md's own documented precedent.
+// (TestResolveQualifiesByDomainToAvoidCollisions above already covers this
+// exact shape and still passes after the P2-3 fix; this test asserts it
+// explicitly under the collapse pass's own name for traceability.)
+func TestResolveDoesNotCollapseDistinctQualifiedSkillsSharingABareName(t *testing.T) {
+	root := t.TempDir()
+	writeSkill(t, filepath.Join(root, "automation"), "modbus", "---\nname: modbus\ndomain: automation\ndescription: automation modbus\n---\n")
+	writeSkill(t, filepath.Join(root, "networking"), "modbus", "---\nname: modbus\ndomain: networking\ndescription: networking modbus\n---\n")
+	merged, err := Resolve(root, t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(merged) != 2 {
+		t.Fatalf("expected both distinct qualified skills to survive, got %d: %+v", len(merged), merged)
+	}
+}
+
+// TestResolveWithPrivateCollapsePrecedenceLocalWinsOverPrivateLegacy
+// confirms tier precedence still applies correctly to the collapsed
+// group: a legacy skill in the private tier loses to a qualified skill of
+// the same bare name in the local tier (local > private, as always).
+func TestResolveWithPrivateCollapsePrecedenceLocalWinsOverPrivateLegacy(t *testing.T) {
+	g, p, l := t.TempDir(), t.TempDir(), t.TempDir()
+	writeLegacySkill(t, p, "shared")
+	writeSkill(t, l, "shared", "---\nname: shared\ndomain: software\ndescription: local qualified\n---\n")
+
+	merged, err := ResolveWithPrivate(g, p, l)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(merged) != 1 {
+		t.Fatalf("expected the legacy/qualified pair to collapse into one entry, got %d: %+v", len(merged), merged)
+	}
+	if merged[0].Source != "local" || merged[0].Description != "local qualified" {
+		t.Fatalf("expected local (qualified) to win over private (legacy), got %+v", merged[0])
 	}
 }

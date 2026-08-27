@@ -1,0 +1,30 @@
+scenario: doc-context-overmatch-fixed
+mode: harness-v2
+phase: 9
+fix: P1-2
+fixture: benchmarks/fixtures/large-context
+request: "add input validation to the auth token check so an empty token is rejected"
+before:
+  command: eng context project "<request above>"
+  docs_matched: 4
+  sections: [auth/, cli/, api/, utils/]
+  source: benchmarks/results/large-context-auth-validation-harness-v2.yaml (Phase 8 finding)
+after:
+  command: eng context project "<request above>"
+  docs_matched: 1
+  sections: [auth/]
+  fixture_total_doc_sections: 6
+notes: >
+  Reaches the ideal answer exactly (1/6, only the genuinely relevant section), better than this
+  phase's own "materially reduced, target 1-2/6" acceptance bar. db/ and cache/ were already
+  correctly excluded before this fix (as noted in the Phase 8 result); cli/, api/, and utils/
+  are now also correctly excluded.
+fix_summary: >
+  cli/internal/docsearch/docsearch.go: same word-boundary tokenization + weighted scoring
+  (TitleWordWeight=2, BodyWordWeight=1) with MinMatchScore=2 as the skillmatch fix, applied to
+  doc-section title/body matching instead of skill tag/trigger/description matching. A single
+  title-word hit still clears the threshold on its own; a single body-word hit no longer does.
+verification: >
+  cli/internal/docsearch/docsearch_test.go — TestMatchIgnoresSubstringInsideUnrelatedWord,
+  TestMatchSingleBodyWordAloneDoesNotClearThreshold, TestMatchSingleTitleWordAloneClearsThreshold
+  — all PASS, alongside the pre-existing TestMatchRanksByScoreAndCaps/TestMatchNoCapReturnsAll.

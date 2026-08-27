@@ -1,0 +1,57 @@
+note: phase9-reverify
+purpose: >
+  Re-run every Phase 8 benchmark scenario whose result could plausibly be affected by Phase 9's
+  code changes (triage, skillmatch, docsearch, workflow, task-completion). Original Phase 8
+  result files are left unmodified as the historical record; each finding here either confirms
+  "unchanged" or points at the dedicated Phase 9 result file that documents the actual change.
+
+quick-fix-timeout:
+  original: benchmarks/results/quick-fix-timeout-harness-v2.yaml
+  affected_by: P1-1 (triage fix)
+  reverify: benchmarks/results/quick-fix-timeout-triage-fixed.yaml
+  summary: >
+    The Phase 8 "feature, not quick-fix" finding is now fixed — eng triage returns quick-fix for
+    the canonical example. The mechanism_proof path (explicit --risk quick-fix) documented in
+    the original Phase 8 result is unaffected and still works identically.
+
+large-context-auth-validation:
+  original: benchmarks/results/large-context-auth-validation-harness-v2.yaml
+  affected_by: P1-2 (docsearch fix)
+  reverify: benchmarks/results/doc-context-overmatch-fixed.yaml
+  summary: >
+    docs_matched dropped from 4/6 to 1/6 against the identical fixture and request. Skill
+    routing's own result in the original Phase 8 file (0 false positives) is unaffected —
+    re-confirmed separately below.
+
+cross-domain-esp32-siemens-modbus:
+  original: benchmarks/results/cross-domain-esp32-siemens-modbus-harness-v2.yaml
+  affected_by: P2-2 (skillmatch fix) and the embedded/esp32 tag fix (Decision 11) — both touch
+    the exact skills this scenario selects
+  reverify_command: 'eng context skills "ESP32 reads Siemens S7-1200 over Modbus TCP"'
+  reverify_result: [siemens-s7, modbus, esp32, tcp-ip, plc]
+  summary: >
+    UNCHANGED — the exact same 5-skill set Phase 6/8 documented, including plc correctly pulled
+    in only via siemens-s7's requires: dependency. Confirms neither the skillmatch weighting
+    change nor the esp32 tag removal regressed this scenario. Also independently re-confirmed via
+    go test ./... -run TestRouterEvalScenarios/esp32-siemens-modbus.
+
+feature-csv-export / bug-lastn-off-by-one / legacy-v1-compat / tool-routing-git-status / failure-safety:
+  affected_by: P2-1 (task-completion messaging) for the first two; P1-4 (workflow config) and
+    Legacy/Hybrid detection for legacy-v1-compat; none of the others touch tool-routing or
+    failure-safety's own mechanics.
+  reverify: >
+    Re-ran the Quick Fix, Spec-First, and Legacy/Hybrid E2E paths fresh against Phase 9's own
+    binary (Task 10.3 of .plans/2026-08-26-v2-harness-phase9-core-refinement/tasks.md) rather
+    than replaying these exact five scenarios byte-for-byte — the state machine paths they
+    exercise are the same paths Task 10.3 covers directly. All confirmed unchanged: TRIAGED →
+    (quick-fix or spec-first path) → ... → COMPLETED, hybrid mode auto-detected with zero
+    migration, eng doctor's new Workflow: section reports "enabled (default)" for a project
+    with no workflow: block at all (the exact pre-Phase-9 behavior, now explicit rather than
+    accidental).
+
+conclusion: >
+  No Phase 8 benchmark scenario regressed. Three were directly, intentionally improved (quick-
+  fix-timeout, large-context-auth-validation, and transitively cross-domain-esp32-siemens-modbus
+  which stayed correct through two related code changes). No re-run required a change to a
+  Phase 8 result file's own committed content — each Phase 8 file remains an accurate snapshot
+  of what Phase 8 observed at the time.

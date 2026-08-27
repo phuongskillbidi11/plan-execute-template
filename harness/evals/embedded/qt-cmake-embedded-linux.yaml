@@ -1,0 +1,24 @@
+name: qt-cmake-embedded-linux
+request: "Build this Qt application for an ARM embedded Linux target using CMake."
+expected_skills:
+  - qt
+  - cmake
+  - embedded-linux
+  - cross-compilation
+  - linux
+forbidden_skills:
+  - esp32
+notes: >
+  Phase 9's Example B. qt pulls in cpp via its own requires:; cmake, embedded-linux, and
+  cross-compilation are all real trigger/tag matches; linux (it/linux) matches "Linux" in the
+  request text directly. No PLC/automation skill should appear — this request has nothing to do
+  with industrial automation. esp32 is explicitly forbidden: this scenario caught a real defect
+  during Phase 9 dogfooding — embedded/esp32 carried a bare "embedded" tag, causing it to
+  false-match any request mentioning the generic word "embedded" (weight-3, a curated-tag-
+  strength false positive analogous to P2-2). Fixed by removing the tag — esp32's own real
+  triggers (esp32, esp-32, esp-idf, arduino) are unaffected and still fire correctly for actual
+  ESP32 requests (see cross-domain-esp32-siemens-modbus). This test run with maxSkills=0 (no
+  cap) proves router correctness; benchmarks/results/qt-cmake-embedded-linux-harness-v2.yaml
+  separately documents that under a real project's default max_skills:5 budget, cross-
+  compilation (the lowest-scoring of the 5 real matches) is budget-cut rather than mis-routed —
+  an expected consequence of a bounded budget, not a routing defect.

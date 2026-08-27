@@ -1,0 +1,12 @@
+name: csharp-winforms-rs485
+category: cross-domain
+request: >
+  Maintain a C# WinForms UHF RFID configuration tool using RS485 and USB-HID.
+fixture: fixtures/csharp-winforms-rfid
+modes: [harness-v2]
+expected:
+  skills_include: [csharp-dotnet, winforms, serial-communications]
+forbidden:
+  - plc
+  - siemens-s7
+  - modbus

@@ -24,6 +24,17 @@ func binDir() string {
 	return filepath.Join(harnessDir(), "bin")
 }
 
+// harnessVersion reads ~/.engineering-harness/VERSION, trimmed — "" if the
+// harness isn't installed or the file is missing. Shared by doctor.go and
+// start_cmd.go so there's one read of this file, not two.
+func harnessVersion() string {
+	data, err := os.ReadFile(filepath.Join(harnessDir(), "VERSION"))
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
 func cmdInstall(args []string) {
 	flagset := flag.NewFlagSet("install", flag.ExitOnError)
 	from := flagset.String("from", ".", "path to a checkout containing a harness/ directory")

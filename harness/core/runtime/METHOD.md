@@ -14,7 +14,10 @@ expected default typing surface for a normal request.
 
 ## The sequence
 
-1. Run `eng doctor` once per session to confirm harness/project state.
+1. Run `eng doctor` once per session to confirm harness/project state. If `eng` isn't found on
+   PATH in this shell, `eng start` (Phase 9 onward) sets `ENG_HOME` before launching this
+   session — fall back to `"$ENG_HOME/bin/eng"` (`%ENG_HOME%\bin\eng.exe` on Windows) rather
+   than concluding the harness isn't installed.
 2. Run `eng workflow start "<the exact requirement text>"`. This triages the request (see
    `core/triage/METHOD.md`), scaffolds a plan via `eng plan new`, and reports the initial
    state and risk level.

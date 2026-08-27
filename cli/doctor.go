@@ -23,8 +23,7 @@ func cmdDoctor(args []string) {
 
 	hDir := harnessDir()
 	if info, err := os.Stat(hDir); err == nil && info.IsDir() {
-		versionData, _ := os.ReadFile(filepath.Join(hDir, "VERSION"))
-		fmt.Printf("Harness install:   found at %s (version %s)\n", hDir, strings.TrimSpace(string(versionData)))
+		fmt.Printf("Harness install:   found at %s (version %s)\n", hDir, harnessVersion())
 	} else {
 		fmt.Println("Harness install:   NOT FOUND — run `eng install --from <path>`")
 	}
@@ -43,6 +42,7 @@ func cmdDoctor(args []string) {
 
 	if cfg, err := project.Load(dir); err == nil {
 		fmt.Printf("Detected stack:    %s\n", cfg.Stack.Type)
+		printWorkflowStatus(cfg.Workflow)
 	}
 
 	report, err := skillvalidate.Validate(filepath.Join(hDir, "skills"), privateSkillsRoot(dir), filepath.Join(dir, "skills"))
@@ -79,6 +79,31 @@ func cmdDoctor(args []string) {
 		}
 		fmt.Printf("  %-10s %s\n", name, status)
 	}
+}
+
+// printWorkflowStatus makes eng doctor's resolved workflow behavior
+// explicit enough that a literal config can never silently mean the
+// opposite (Phase 9 spec.md "Project Config Validation" / P1-4). Each line
+// shows the resolved value and whether it came from an explicit setting or
+// the default.
+func printWorkflowStatus(w project.Workflow) {
+	fmt.Println("\nWorkflow:")
+	printWorkflowField("triage", w.Triage, w.TriageEnabled())
+	printWorkflowField("plan_review", w.PlanReview, w.PlanReviewEnabled())
+	printWorkflowField("verifier", w.Verifier, w.VerifierEnabled())
+	fmt.Printf("  planning     %s\n", w.PlanningModeOrDefault())
+}
+
+func printWorkflowField(name string, explicit *bool, resolved bool) {
+	state := "enabled"
+	if !resolved {
+		state = "disabled"
+	}
+	source := "default"
+	if explicit != nil {
+		source = "explicit"
+	}
+	fmt.Printf("  %-12s %s (%s)\n", name, state, source)
 }
 
 // issuedSkillNames counts distinct skills with at least one issue, so

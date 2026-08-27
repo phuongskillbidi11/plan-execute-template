@@ -89,6 +89,26 @@ func Validate(globalRoot, privateRoot, localRoot string) (Report, error) {
 		for _, qn := range dup {
 			report.Issues = append(report.Issues, Issue{qn, SeverityWarning, fmt.Sprintf("duplicate skill %q authored more than once under %s", qn, root)})
 		}
+
+		// Shadow observability (Phase 9 spec.md P2-3): a raw discovered
+		// SKILL.md whose own QualifiedName either lost to a higher-precedence
+		// source at the same key, or was removed entirely by the legacy
+		// bare-name collapse (skills.ResolveWithPrivate), is reported here
+		// with which source actually won — the "explain which source won"
+		// requirement, covering both mechanisms uniformly.
+		for _, s := range found {
+			winner, ok := byQualified[s.QualifiedName()]
+			if ok && winner.Path == s.Path {
+				continue // this file is the one that survived resolution
+			}
+			if ok {
+				report.Issues = append(report.Issues, Issue{s.Name, SeverityWarning,
+					fmt.Sprintf("shadowed by %s (source: %s) — this file under %s did not win resolution", winner.QualifiedName(), winner.Source, root)})
+			} else {
+				report.Issues = append(report.Issues, Issue{s.Name, SeverityWarning,
+					fmt.Sprintf("shadowed — this file under %s was resolved as a duplicate of a higher-precedence skill sharing its bare name", root)})
+			}
+		}
 	}
 
 	for _, s := range merged {

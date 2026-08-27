@@ -1,0 +1,14 @@
+name: csharp-winforms-rs485
+request: "Maintain a C# WinForms UHF RFID configuration tool using RS485 and USB-HID."
+expected_skills:
+  - csharp-dotnet
+  - winforms
+  - serial-communications
+forbidden_skills:
+  - plc
+  - siemens-s7
+notes: >
+  Phase 9's Example A. Reproduces a real dogfooding finding: before the Phase 9 P2-2 fix, this
+  request selected automation/plc and automation/siemens-s7 (via weak, unweighted description-
+  word matches) despite having nothing to do with PLCs. See benchmarks/BACKLOG.md P2-2 and
+  benchmarks/results/skill-routing-rs485-not-plc.yaml for the full before/after evidence.

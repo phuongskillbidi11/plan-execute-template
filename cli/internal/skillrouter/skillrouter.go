@@ -87,7 +87,7 @@ func Route(all []skills.Skill, request string, explicit []string, domains []stri
 		if _, ok := selected[s.QualifiedName()]; ok {
 			continue
 		}
-		if sc := skillmatch.Score(s, request); sc > 0 {
+		if sc := skillmatch.Score(s, request); sc >= skillmatch.MinMatchScore {
 			candidates = append(candidates, scored{s, sc})
 		}
 	}

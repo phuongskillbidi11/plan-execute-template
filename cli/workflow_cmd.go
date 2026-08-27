@@ -104,6 +104,7 @@ func workflowStatus(args []string) {
 	}
 	decision := workflow.Decide(facts)
 	fmt.Printf("Next:          %s\n", decision.Reason)
+	printUncheckedChecklistLines(meta.State, planDir)
 }
 
 func workflowAdvance(args []string) {
@@ -133,6 +134,7 @@ func workflowAdvance(args []string) {
 
 	if decision.NextState == meta.State {
 		fmt.Printf("Still in %s — %s\n", meta.State, decision.Reason)
+		printUncheckedChecklistLines(meta.State, planDir)
 		printNextAction(meta.State, planDir)
 		return
 	}
@@ -171,6 +173,21 @@ func workflowAdvance(args []string) {
 	printNextAction(meta.State, planDir)
 }
 
+// printUncheckedChecklistLines names the specific tasks.md line(s) blocking
+// advance out of EXECUTING/NEEDS_FIX, instead of leaving "tasks.md still
+// has unchecked items" to be figured out by re-reading the whole file.
+// Phase 9 spec.md P2-1 — the bottom Completion checklist stays the sole
+// authoritative source; this only improves what's printed about it.
+func printUncheckedChecklistLines(state, planDir string) {
+	if state != workflow.StateExecuting && state != workflow.StateNeedsFix {
+		return
+	}
+	lines := uncheckedChecklistLines(planDir)
+	for _, l := range lines {
+		fmt.Printf("               %s\n", l)
+	}
+}
+
 func printNextAction(state, planDir string) {
 	switch state {
 	case workflow.StateTriaged, workflow.StateNeedsReplan:
@@ -200,7 +217,7 @@ func gatherFacts(planDir string, meta *planmeta.Meta) (workflow.Facts, error) {
 	planningMode := "auto_plan"
 	requireSpecApproval := true
 	if cfg, err := project.Load(repoRoot); err == nil {
-		reviewRequired = reviewRequired || cfg.EffectiveWorkflow().PlanReview
+		reviewRequired = reviewRequired || cfg.Workflow.PlanReviewEnabled()
 		planningMode = cfg.Workflow.PlanningModeOrDefault()
 		requireSpecApproval = cfg.Workflow.RequireSpecApprovalOrDefault()
 	}
@@ -261,16 +278,30 @@ func filesReady(planDir string) bool {
 }
 
 func tasksComplete(planDir string) bool {
+	return len(uncheckedChecklistLines(planDir)) == 0
+}
+
+// uncheckedChecklistLines returns every "- [ ]" line in tasks.md, trimmed —
+// the same scan tasksComplete has always gated on (the bottom Completion
+// checklist remains the sole machine-authoritative source, per Phase 9
+// spec.md P2-1/DECISION_LOG.md Decision 5), surfaced so `eng workflow
+// advance`'s "still has unchecked items" message can name the actual
+// blocking line(s) instead of leaving an Executor to guess.
+func uncheckedChecklistLines(planDir string) []string {
 	f, err := os.Open(filepath.Join(planDir, "tasks.md"))
 	if err != nil {
-		return false
+		return nil
 	}
 	defer f.Close()
+	var out []string
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		if strings.HasPrefix(scanner.Text(), "- [ ]") {
-			return false
+		// Same exact detection tasksComplete has always used — untrimmed,
+		// so this is byte-identical to the pre-Phase-9 gating logic. Only
+		// the appended copy is trimmed, for display.
+		if line := scanner.Text(); strings.HasPrefix(line, "- [ ]") {
+			out = append(out, strings.TrimSpace(line))
 		}
 	}
-	return true
+	return out
 }

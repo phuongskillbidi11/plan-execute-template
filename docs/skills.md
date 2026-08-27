@@ -56,6 +56,16 @@ different domains may share a bare name on purpose — `automation/modbus` and a
 `networking/modbus` would not collide. `eng skills validate` warns only when the exact same
 qualified name is authored twice under one source root — a real mistake.
 
+**Legacy-vs-qualified bare-name collapse (Phase 9):** a bare-name collision is treated
+differently when one side is a legacy (frontmatter-less) skill and the other is qualified — that
+combination collapses to whichever tier has precedence (`local` > `private` > `global`), since a
+legacy skill sharing a global skill's exact bare name is almost always the same conceptual skill
+re-declared without frontmatter (e.g. a pre-harness project-local copy), not a deliberate
+cross-domain reuse. A group made entirely of qualified skills (the `automation/modbus` /
+`networking/modbus` case above) is never collapsed this way. `eng skills validate` reports which
+source won as a `shadowed by ...` warning. See `cli/internal/skills/skills.go`'s
+`collapseLegacyDuplicates`.
+
 ## Dependencies
 
 `requires:` is transitive and never dropped by the context budget, even when the skill
@@ -72,7 +82,7 @@ explicit project-enabled skills (.agent/project.yaml's enabled_skills)
       ↓  (never dropped)
 required dependencies (transitive)
       ↓  (never dropped)
-strong request matches (tag/trigger/description score > 0)
+strong request matches (weighted score >= a minimum threshold — see below)
       ↓  (best score first)
 project domain-profile fills (.agent/project.yaml's domains:)
       ↓
@@ -82,6 +92,15 @@ budget cutoff
 ```
 
 See it explain itself for any request: `eng context skills "<request text>"`.
+
+**Weighted scoring (Phase 9):** a `tags:`/`triggers:` match is weighted higher than a
+`description:` word match, and matching is word/phrase-boundary based (not raw substring
+containment) — a description word can no longer accidentally match as a substring of an
+unrelated request word, and a single generic description-word match alone is no longer enough
+to select a skill (a single tag/trigger match still is). See
+`cli/internal/skillmatch/skillmatch.go`'s `TagTriggerWeight`/`DescriptionWordWeight`/
+`MinMatchScore` constants for the exact current values — deliberately not restated here, since
+they're implementation detail that could drift out of sync with this doc.
 
 ## Project profiles (`domains:`)
 

@@ -111,6 +111,14 @@ eng start
 tells you it isn't). If the project isn't initialized yet, it says so and suggests `eng init`
 or `eng start --init` (initialize and continue in one step).
 
+**If a spawned agent session reports `eng: command not found`** (fixed in Phase 9 — see
+`docs/gotchas.md`): `eng start` prepends a known-working `eng` location to the launched
+session's own `PATH`, so this should no longer happen. It also sets `ENG_HOME` (the harness
+install directory), `ENG_PROJECT_ROOT`, and `ENG_VERSION` as environment variables in that
+session — if `eng` still somehow isn't resolvable inside a nested shell the session spawns
+(e.g. its own shell profile scripts reset `PATH`), fall back to `"$ENG_HOME/bin/eng"`
+(`%ENG_HOME%\bin\eng.exe` on Windows) as an absolute path.
+
 Inside that session, **speak naturally** — don't type `eng` commands yourself:
 
 ```text
@@ -242,6 +250,13 @@ files changed since the plan's stamped `git_sha` (scoped to `write_scope` if set
 check; once a plan is past that gate, run `eng plan drift <dir>` directly if you want to check
 again.
 
+**What actually gates the `EXECUTING → VERIFYING` transition:** only `tasks.md`'s bottom
+**Completion checklist** (the `- [ ]` items) — the per-task `**Status:**` marker next to each
+individual task is for human/Executor tracking only and is never read by `eng`. Marking every
+task's own `**Status:**` to `[x]` is not enough on its own; check off the Completion checklist
+too. If `eng workflow advance` reports unchecked items, it now names the specific blocking
+line(s) rather than a generic message (fixed in Phase 9 — see `docs/gotchas.md`).
+
 ---
 
 ## Command reference
@@ -360,9 +375,10 @@ domains: []                          # optional — e.g. [embedded, automation],
 private_skills_path: ""              # optional — a third skill-resolution tier between
                                       # global and project-local (any local dir or checkout)
 workflow:
-  triage: false                      # false in every block == "not explicitly configured";
-  plan_review: false                 # an absent/all-false `workflow:` block means
-  verifier: false                    # "everything enabled" (EffectiveWorkflow's default)
+  triage: false                      # omit any of these three to default to true (enabled);
+  plan_review: false                 # each field is independent — explicit false stays false,
+  verifier: false                    # it does NOT fall back to "everything enabled" (fixed
+                                      # in Phase 9 — see docs/gotchas.md)
   planning_mode: spec_first          # auto_plan | spec_first — eng init writes spec_first
   require_spec_approval: true        # defaults to true when unset
 retry_budget:                        # optional — defaults to {build:2, unit_test:2, integration_test:1}
@@ -377,6 +393,10 @@ tools:                                # optional — Phase 7 tool policy, see do
 
 `stack.*_cmd` fields are `executil.Command` — either a plain shell string or a structured argv;
 `eng init` fills these from auto-detection, and you can hand-edit them at any time.
+
+`eng doctor` reports each `workflow:` field's resolved value and whether it's explicit or
+defaulted (`enabled (default)` / `disabled (explicit)`), plus the resolved `planning_mode` —
+run it after hand-editing `workflow:` to confirm the config means what you intended.
 
 ---
 

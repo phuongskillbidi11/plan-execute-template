@@ -49,3 +49,33 @@ func TestMatchNoCapReturnsAll(t *testing.T) {
 		t.Fatalf("expected 2 with no cap, got %d", len(matched))
 	}
 }
+
+// TestMatchIgnoresSubstringInsideUnrelatedWord mirrors the skillmatch fix
+// for docsearch: a body word must not match merely because it's a substring
+// of an unrelated request word.
+func TestMatchIgnoresSubstringInsideUnrelatedWord(t *testing.T) {
+	sections := []Section{{Title: "Unrelated", Body: "form a hypothesis about the cause"}}
+	matched := Match(sections, "Maintain a C# WinForms configuration tool", 0)
+	if len(matched) != 0 {
+		t.Fatalf("expected 0 (no word-boundary match), got %d", len(matched))
+	}
+}
+
+// TestMatchSingleBodyWordAloneDoesNotClearThreshold guards Phase 9 P1-2: a
+// single generic body-word match must not clear MinMatchScore on its own,
+// while a title match does.
+func TestMatchSingleBodyWordAloneDoesNotClearThreshold(t *testing.T) {
+	sections := []Section{{Title: "Something else entirely", Body: "covers protocol basics only"}}
+	matched := Match(sections, "a totally unrelated firmware question about protocol handling", 0)
+	if len(matched) != 0 {
+		t.Fatalf("expected a lone body word not to clear MinMatchScore, got %d matched", len(matched))
+	}
+}
+
+func TestMatchSingleTitleWordAloneClearsThreshold(t *testing.T) {
+	sections := []Section{{Title: "auth/ — token validation", Body: "unrelated body text"}}
+	matched := Match(sections, "add input validation to the auth check", 0)
+	if len(matched) != 1 {
+		t.Fatalf("expected a single title-word match to clear MinMatchScore, got %d", len(matched))
+	}
+}

@@ -1,0 +1,54 @@
+scenario: qt-cmake-embedded-linux
+mode: harness-v2
+phase: 9
+context_no_cap:
+  command: "skillrouter.Route(..., maxSkills=0), matching cli/skilleval_integration_test.go's TestRouterEvalScenarios convention"
+  skills_selected: [karpathy-guidelines, qt, cmake, embedded-linux, cross-compilation, linux, cpp]
+  scores: {embedded-linux: 12, cmake: 8, linux: 7, qt: 6, cross-compilation: 2}
+  notes: all 5 expected skills present; esp32 correctly absent after the tag fix below.
+context_real_default_budget:
+  command: 'eng context skills "Build this Qt application for an ARM embedded Linux target using CMake." (max_skills: 5, the real default)'
+  skills_selected:
+    - name: karpathy-guidelines
+      reason: explicitly enabled
+    - name: embedded-linux
+      reason: matched request text
+    - name: cmake
+      reason: matched request text
+    - name: linux
+      reason: matched request text
+    - name: qt
+      reason: matched request text
+    - name: cpp
+      reason: required by software/qt
+  skills: 6
+  budget_cut: [cross-compilation]
+  notes: >
+    Under the real default budget (5, which counts the 1 explicit karpathy-guidelines skill
+    against it too), cross-compilation — the lowest-scoring of the 5 real Tier-B matches (score
+    2, vs. 12/8/7/6 for the other four) — is budget-cut rather than mis-routed. This is an
+    expected consequence of a bounded context budget for a request that genuinely concerns 5
+    domain skills at once, not a routing defect — the router itself correctly identifies all 5
+    as relevant (see context_no_cap above). Consistent with how Phase 6's own
+    esp32-siemens-modbus eval is deliberately run unconstrained for the same reason.
+real_defect_found_and_fixed:
+  defect: >
+    embedded/esp32's frontmatter carried tags: [esp32, embedded, microcontroller]. The bare
+    "embedded" tag (a curated, weight-3 signal) matched this request's literal word "embedded"
+    (from "ARM embedded Linux target"), giving esp32 a false-positive score of 4 — high enough
+    to outscore cross-compilation (2) and win a budget slot for a request that has nothing to
+    do with ESP32.
+  fix: 'Removed the "embedded" tag from harness/skills/embedded/esp32/SKILL.md. esp32''s real
+    identifying signals (esp32, esp-32, esp-idf, arduino triggers; esp32/microcontroller tags)
+    are untouched and still fire correctly — re-verified against
+    cross-domain-esp32-siemens-modbus-harness-v2.yaml''s own scenario, unchanged.'
+  classification: >
+    Same defect class as P2-2 (a generic word functioning as a strong curated-tag signal) —
+    found via dogfooding this phase's own new eval scenario, not hypothesized. Fixed within
+    Phase 9's existing P2-2 scope rather than deferred, since it directly blocked this phase's
+    own Example B acceptance criterion and the fix is a single-line, well-justified tag removal.
+  regression_test: "harness/evals/embedded/qt-cmake-embedded-linux.yaml's forbidden_skills: [esp32]"
+verification: >
+  go test ./... -run TestRouterEvalScenarios -v — csharp-winforms-rs485 and
+  qt-cmake-embedded-linux (both new) and esp32-siemens-modbus, docker-linux-ci, cpp-debug (all
+  pre-existing) — all PASS.

@@ -18,6 +18,22 @@ func TestLoadScenariosParsesFields(t *testing.T) {
 	}
 }
 
+// TestLoadScenariosParsesForbiddenSkills covers the Phase 9 addition — a
+// scenario file with no forbidden_skills key must still parse fine
+// (backward compatible), and one that has it must parse it correctly.
+func TestLoadScenariosParsesForbiddenSkills(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "example.yaml"), []byte(
+		"name: example\nrequest: \"rs485\"\nexpected_skills: [serial-communications]\nforbidden_skills: [plc, siemens-s7]\n"), 0o644)
+	scenarios, err := LoadScenarios(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scenarios) != 1 || len(scenarios[0].ForbiddenSkills) != 2 {
+		t.Fatalf("got %+v", scenarios)
+	}
+}
+
 func TestLoadScenariosMissingRootIsNotError(t *testing.T) {
 	scenarios, err := LoadScenarios(filepath.Join(t.TempDir(), "nope"))
 	if err != nil || len(scenarios) != 0 {

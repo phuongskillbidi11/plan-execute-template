@@ -20,9 +20,15 @@ type Stack struct {
 }
 
 type Workflow struct {
-	Triage     bool `yaml:"triage"`
-	PlanReview bool `yaml:"plan_review"`
-	Verifier   bool `yaml:"verifier"`
+	// Triage/PlanReview/Verifier are pointers so YAML can distinguish "not
+	// set" (nil, defaults to true — the behavior every project.yaml written
+	// before Phase 9 already has) from "explicitly false". Before Phase 9
+	// these were plain bools and a config with all three explicitly false
+	// was indistinguishable from an omitted workflow: block — both silently
+	// resolved to all-enabled. See Phase 9 spec.md P1-4 and DECISION_LOG.md.
+	Triage     *bool `yaml:"triage,omitempty"`
+	PlanReview *bool `yaml:"plan_review,omitempty"`
+	Verifier   *bool `yaml:"verifier,omitempty"`
 
 	// PlanningMode: "" (unset) | "auto_plan" | "spec_first". Empty means
 	// "this project predates Phase 5, or never set it" — PlanningModeOrDefault
@@ -37,11 +43,22 @@ type Workflow struct {
 	RequireSpecApproval *bool `yaml:"require_spec_approval,omitempty"`
 }
 
-// enabled reports whether this Workflow struct was ever explicitly set.
-// An all-false zero value means "the workflow block was absent" — callers
-// treat that as "everything enabled" via EffectiveWorkflow.
-func (w Workflow) enabled() bool {
-	return w.Triage || w.PlanReview || w.Verifier
+// TriageEnabled/PlanReviewEnabled/VerifierEnabled each default to true only
+// when their field was never set — the same nil-means-default pattern
+// RequireSpecApprovalOrDefault already uses. Each field now resolves
+// independently; there is no group "was the workflow: block present at
+// all" fallback anymore, because there's no longer any ambiguity left for
+// one to resolve.
+func (w Workflow) TriageEnabled() bool {
+	return w.Triage == nil || *w.Triage
+}
+
+func (w Workflow) PlanReviewEnabled() bool {
+	return w.PlanReview == nil || *w.PlanReview
+}
+
+func (w Workflow) VerifierEnabled() bool {
+	return w.Verifier == nil || *w.Verifier
 }
 
 // PlanningModeOrDefault returns "auto_plan" when unset — the behavior
@@ -100,15 +117,6 @@ type Config struct {
 	// pre-existing, unread RequireApproval field above — see Phase 7
 	// spec.md Decision 2.
 	Tools toolpolicy.Policy `yaml:"tools,omitempty"`
-}
-
-// EffectiveWorkflow returns the configured Workflow, or all-enabled if this
-// project.yaml predates Phase 2 (no workflow block at all).
-func (c *Config) EffectiveWorkflow() Workflow {
-	if c.Workflow.enabled() {
-		return c.Workflow
-	}
-	return Workflow{Triage: true, PlanReview: true, Verifier: true}
 }
 
 // EffectiveRetryBudget returns the configured budget, or Phase 2's default

@@ -1,0 +1,28 @@
+scenario: quick-fix-timeout-triage-fixed
+mode: harness-v2
+phase: 9
+fix: P1-1
+before:
+  command: 'eng triage "Increase the reconnect timeout from 1000 ms to 1500 ms."'
+  suggested_level: feature
+  source: benchmarks/results/quick-fix-timeout-harness-v2.yaml (Phase 8 finding)
+after:
+  command: 'eng triage "Increase the reconnect timeout from 1000 ms to 1500 ms."'
+  suggested_level: quick-fix
+  suggested_workflow: "quick workflow — localized parameter/config value change, skip full spec"
+counter_example:
+  command: 'eng triage "Increase the session timeout for authenticated users from 30 to 60 minutes."'
+  suggested_level: high-risk
+  notes: >
+    Confirms a size-hinting request is NOT automatically downgraded to quick-fix when it also
+    touches something risky (here: authentication) — the new looksLikeParameterTweak check is
+    only consulted after every risk-elevating keyword category has already had a chance to
+    match, per cli/triage_cmd.go's existing table order.
+verification:
+  test: "cli/triage_cmd_test.go — TestKeywordLevelQuickFixParameterTweak, TestKeywordLevel
+    RiskyParameterTweakStaysElevated, TestKeywordLevelHardwareControlStaysElevated,
+    TestKeywordLevelBreakingPublicAPIChangeStaysArchitecture, TestKeywordLevelDataMigration
+    StaysHighRisk, TestKeywordLevelExistingCategoriesUnchanged, TestLooksLikeParameterTweak — all PASS"
+notes: >
+  Resolves benchmarks/BACKLOG.md P1-1. The canonical Quick Fix example from the Phase 8
+  instruction now classifies correctly with no manual --risk override needed.

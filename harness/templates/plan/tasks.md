@@ -13,6 +13,12 @@
 > Never mark `[x]` without running the verification command first.
 > When a task becomes `[!]`, write the exact error below the task line
 > and stop. Do not attempt the next task.
+>
+> **What actually gates `eng workflow advance`:** the per-task `**Status:**` marker above is
+> for human/Executor tracking only — `eng` does not read it. Only the **Completion checklist**
+> at the bottom of this file (the `- [ ]` items) is machine-checked. Marking every task's own
+> `**Status:**` to `[x]` is not enough on its own; the Completion checklist items must also be
+> checked off before the plan can advance past `EXECUTING`.
 
 ---
 
