@@ -44,7 +44,7 @@ func reorderFlagsFirst(args []string, boolFlags map[string]bool) []string {
 
 func cmdPlan(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: eng plan <new|drift|retry|review|approve|approve-spec|escalate|block|cancel> ...")
+		fmt.Println("Usage: eng plan <new|drift|retry|review|approve|approve-spec|verify-review|escalate|block|cancel> ...")
 		os.Exit(1)
 	}
 	switch args[0] {
@@ -60,6 +60,8 @@ func cmdPlan(args []string) {
 		planApprove(args[1:])
 	case "approve-spec":
 		planApproveSpec(args[1:])
+	case "verify-review":
+		planVerifyReview(args[1:])
 	case "escalate":
 		planEscalate(args[1:])
 	case "block":
@@ -67,7 +69,7 @@ func cmdPlan(args []string) {
 	case "cancel":
 		planCancel(args[1:])
 	default:
-		fmt.Println("Usage: eng plan <new|drift|retry|review|approve|approve-spec|escalate|block|cancel> ...")
+		fmt.Println("Usage: eng plan <new|drift|retry|review|approve|approve-spec|verify-review|escalate|block|cancel> ...")
 		os.Exit(1)
 	}
 }
@@ -273,6 +275,45 @@ func planReview(args []string) {
 	}
 	planmeta.AppendEvent(planDir, "reviewed", *verdict)
 	fmt.Printf("Recorded review verdict: %s (%d blocking issues)\n", *verdict, *blocking)
+}
+
+// planVerifyReview records the Verifier role's own independent verdict —
+// deliberately separate from `eng verify`'s mechanical PASS/FAIL (Phase 10
+// spec.md's "Mechanical verification vs. role verification"). Mirrors
+// planReview's exact shape: this command only records the verdict flag;
+// verifier-review.md (scaffolded by `eng plan new`, alongside review.md)
+// is filled in by hand, the same way review.md always has been.
+func planVerifyReview(args []string) {
+	flagset := flag.NewFlagSet("plan verify-review", flag.ExitOnError)
+	verdict := flagset.String("verdict", "", "PASS|FAIL")
+	by := flagset.String("by", "", "who is verifying")
+	notes := flagset.String("notes", "", "free-text notes")
+	flagset.Parse(reorderFlagsFirst(args, map[string]bool{}))
+	rest := flagset.Args()
+	if len(rest) == 0 || (*verdict != "PASS" && *verdict != "FAIL") {
+		fmt.Println(`Usage: eng plan verify-review <plan-dir> --verdict PASS|FAIL [--by <name>] [--notes "..."]`)
+		os.Exit(1)
+	}
+	planDir, _ := filepath.Abs(rest[0])
+
+	meta, err := planmeta.Load(planDir)
+	if err != nil {
+		fmt.Printf("no %s found in %s\n", planmeta.FileName, planDir)
+		os.Exit(1)
+	}
+
+	meta.RoleVerification = planmeta.RoleVerification{
+		Verdict:    *verdict,
+		VerifiedAt: time.Now().UTC().Format(time.RFC3339),
+		VerifiedBy: *by,
+		Notes:      *notes,
+	}
+	if err := planmeta.Save(planDir, meta); err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
+	}
+	planmeta.AppendEvent(planDir, "role_verification_recorded", *verdict)
+	fmt.Printf("Recorded Verifier role verdict: %s\n", *verdict)
 }
 
 func planApprove(args []string) {

@@ -134,3 +134,32 @@ own profile script resets `PATH`) should fall back to `"$ENG_HOME/bin/eng"` — 
 `harness/core/runtime/METHOD.md`.
 
 **From:** `.plans/2026-08-26-v2-harness-phase9-core-refinement/`
+
+### The workflow state machine could "catch up" after real work already happened
+
+**Trap:** `workflow.Decide` is a pure function of *current* file/flag state (`tasks.md`'s
+Completion checklist, `plan.yaml`'s fields) — it has no concept of *when* something became
+true relative to *when* a state was entered. Nothing stopped an agent from doing real work
+(e.g. a browser/UI investigation, which produces no tracked-file diff) while a plan was still
+`APPROVED`, then marking `tasks.md`'s Completion checklist complete afterward.
+
+**Symptom:** `eng workflow advance` transitioned `APPROVED → EXECUTING` (drift detection found
+nothing, since the real work never touched a tracked file) and then, on the very next call,
+`EXECUTING → VERIFYING → COMPLETED` with a PASS verdict — while `eng verify`'s own report
+showed an **empty git diff since the plan's `git_sha`**. The state machine wasn't gating
+execution before it happened; it was rubber-stamping work that had already happened outside it.
+Reproduced deterministically in `benchmarks/fixtures/investigation-bypass/`.
+
+**Fix / rule:** Phase 10 added two things this trap needed: (1) `APPROVED → EXECUTING` (and
+Quick Fix's `TRIAGED → EXECUTING`) now requires the executor role to have actually been
+activated first (`eng adapter prompt executor <plan-dir>`, which now validates and records
+activation instead of just printing a prompt); (2) if `tasks.md`'s Completion checklist is
+*already* fully checked at the exact moment that transition would fire, `Decide` refuses with
+an explicit "this looks like retroactive completion" reason instead of proceeding — no override
+flag exists on purpose. See `docs/ARCHITECTURE.md`'s "Role runtime enforcement" section and
+`benchmarks/results/investigation-bypass-blocked.yaml` for the real before/after proof. This
+does **not** prevent the premature edit itself — a Claude Code session's own native tools are
+outside what a CLI harness can technically intercept — it prevents the workflow from
+retroactively legitimizing one once detected.
+
+**From:** `.plans/2026-08-27-v2-harness-phase10-role-enforcement/`

@@ -103,6 +103,17 @@ Phase 9 also added 9 new skills (C#/.NET desktop, Qt/CMake, serial/protocol engi
 embedded Linux, reverse engineering) for the real project types the harness is now used on —
 see [Skill authoring](#skill-authoring) below.
 
+Real-world dogfooding after Phase 9 found a genuine architectural gap: the Planner → Plan
+Reviewer → Executor → Verifier lifecycle was a documented convention, not something the code
+actually enforced — a plan could reach `COMPLETED` with a PASS verdict and an **empty git
+diff**, because the workflow state machine had no way to tell "completed during execution"
+from "already marked complete before execution began." **Phase 10 fixed this** — role
+activation is now a validated, recorded step, and the state machine provably refuses to
+retroactively legitimize work that happened outside it. See
+[`docs/ARCHITECTURE.md#role-runtime-enforcement-phase-10`](docs/ARCHITECTURE.md#role-runtime-enforcement-phase-10)
+for the design and [`benchmarks/results/investigation-bypass-blocked.yaml`](benchmarks/results/investigation-bypass-blocked.yaml)
+for the real reproduced-and-blocked proof.
+
 See [Known limitations](#known-limitations) for what's still genuinely open, and
 [`benchmarks/README.md`](benchmarks/README.md) for how to reproduce any of this yourself.
 
@@ -222,14 +233,18 @@ Phase 8's benchmark reproduced against the real router — no unrelated-domain s
 Every external capability is `<adapter>.<operation>` (e.g. `git.status`), risk-classified
 (`READ < WRITE < DESTRUCTIVE < HIGH_RISK`), checked against both a role's toolbox and its risk
 ceiling, then checked against project policy (`deny`/`require_approval`/`allow`) — in that
-fixed order. `eng tools invoke` is the only sanctioned invocation path; every outcome, allowed
-or refused, is written to an audit trail.
+fixed order. Since Phase 10, the invoking role must also actually be the plan's currently
+*activated* role (`eng adapter prompt <role> <plan-dir>` records this) before any of that even
+runs. `eng tools invoke` is the only sanctioned invocation path; every outcome, allowed or
+refused, is written to an audit trail.
 
-**Real adapters today:** `git`, `github` (read-only, via the `gh` CLI), and a deterministic
-reference MCP adapter (`docs-search`) that greps local docs — no live network transport. **Not
-implemented:** a full MCP JSON-RPC transport, a tool installer/marketplace, or any live
-industrial-control write adapter (PLC/Modbus/OPC UA). Full model in
-[`docs/tools.md`](docs/tools.md) and [`docs/ARCHITECTURE.md#tool--capability-model-phase-7`](docs/ARCHITECTURE.md#tool--capability-model-phase-7).
+**Real adapters today:** `git`, `github` (read-only, via the `gh` CLI), `codex` (read-only —
+`codex.inspect`/`codex.review`/`codex.verify`, a second-opinion delegation adapter, no write
+capability), and a deterministic reference MCP adapter (`docs-search`) that greps local docs —
+no live network transport. **Not implemented:** a full MCP JSON-RPC transport, a tool
+installer/marketplace, or any live industrial-control write adapter (PLC/Modbus/OPC UA). Full
+model in [`docs/tools.md`](docs/tools.md) and
+[`docs/ARCHITECTURE.md#tool--capability-model-phase-7`](docs/ARCHITECTURE.md#tool--capability-model-phase-7).
 
 ## Important `eng` commands
 
@@ -326,6 +341,11 @@ misclassification of parameter-tweak phrasing, doc-context over-matching relativ
 routing, the dual `tasks.md` completion-convention confusion, a skill-routing false positive on
 non-PLC serial/RS485 projects, and a global/local duplicate-skill resolution bug.
 
+**Resolved in Phase 10:** the workflow state machine could be advanced after real work had
+already happened outside it (role activation was a documented convention, not a runtime-checked
+fact) — see [`docs/ARCHITECTURE.md#role-runtime-enforcement-phase-10`](docs/ARCHITECTURE.md#role-runtime-enforcement-phase-10)
+and [`benchmarks/results/investigation-bypass-blocked.yaml`](benchmarks/results/investigation-bypass-blocked.yaml).
+
 Still open:
 
 - **No live MCP JSON-RPC transport** — the one MCP-style adapter shipped (`docs-search`) is a
@@ -348,13 +368,23 @@ Still open:
   observed alongside the `embedded/esp32` defect Phase 9 did fix, but nothing in Phase 9's own
   scenarios exercises it, so it's documented rather than fixed speculatively.
   [`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md).
+- **Role enforcement cannot intercept a Claude Code session's own native tool calls** — `eng` is
+  a CLI a session chooses to invoke; there is no wrapper/sandbox interposed on Read/Edit/Write/
+  Bash/browser-automation MCP tools. Phase 10's guarantee is that the workflow state machine
+  cannot retroactively legitimize work that happened outside it, not that such work is prevented
+  from happening in the first place — see `docs/ARCHITECTURE.md`'s enforced-vs-instructional
+  table.
+- **No fresh-session isolation for the Verifier role** — recommended in docs for stronger
+  independence from the Executor's own session, but not spawned or enforced by any code.
+- **`codex.execute` (write) does not exist** — Codex delegation is read-only by design; a future
+  write capability would need its own capability name, risk tier, and policy decision.
 
 ## Roadmap
 
-See [`ROADMAP.md`](ROADMAP.md). Short version: continued real-world dogfooding on the newly
-covered project types (C#/.NET, Qt/CMake, embedded Linux) → address the two remaining latent
-routing risks above if real usage shows they matter → then further MCP/skill-distribution
-expansion.
+See [`ROADMAP.md`](ROADMAP.md). Short version: continued real-world dogfooding on role
+enforcement and the newly covered project types (C#/.NET, Qt/CMake, embedded Linux) → address
+the remaining latent risks above if real usage shows they matter → then further MCP/skill-
+distribution expansion.
 
 ## Backward compatibility promise
 

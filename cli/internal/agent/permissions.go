@@ -11,11 +11,16 @@ import "eng/internal/toolcap"
 // capabilities list --role` checks) are listed — two names for the same
 // tool at two different layers; omitting either would silently exclude
 // "gh" from the older binary-detection command's --role filter.
+// Every role's toolbox includes "codex" — Phase 10 spec.md Decision 8: all
+// three shipped Codex capabilities are READ-risk, so every role's
+// existing RoleMaxRisk already permits them; which specific capability a
+// role reaches for (codex.inspect/codex.review/codex.verify) is a
+// METHOD.md/documentation concern, not a toolbox restriction.
 var RolePermissions = map[Role][]string{
-	RolePlanner:  {"git", "github", "gh", "mcp-docs"},
-	RoleReviewer: {"git", "github", "gh", "mcp-docs"},
+	RolePlanner:  {"git", "github", "gh", "mcp-docs", "codex"},
+	RoleReviewer: {"git", "github", "gh", "mcp-docs", "codex"},
 	RoleExecutor: {"git", "github", "gh", "mcp-docs", "claude", "codex", "docker"},
-	RoleVerifier: {"git", "github", "gh", "mcp-docs", "docker"},
+	RoleVerifier: {"git", "github", "gh", "mcp-docs", "docker", "codex"},
 }
 
 // RoleMayUse reports whether role is permitted to consider capability.

@@ -31,7 +31,13 @@ expected default typing surface for a normal request.
 4. At every state, use `eng workflow advance <plan-dir>` for the mechanical transition — never
    decide a transition by judgment. Before invoking a role, run
    `eng adapter prompt <role> <plan-dir> "<request text>"`, which now folds in that role's
-   `eng context bundle` output automatically.
+   `eng context bundle` output automatically. This is not a printed suggestion — it is the
+   **activation boundary** (Phase 10): it validates the role is compatible with the current
+   workflow state and refuses (no prompt printed, non-zero exit) if not, and its success is
+   what `eng workflow advance`'s `APPROVED → EXECUTING` gate and `eng tools invoke`'s role check
+   actually consult. A refusal here means the workflow genuinely isn't ready for that role yet —
+   stop and re-check state (`eng workflow status <plan-dir>`), don't retry blindly or assume the
+   role anyway.
 5. Never skip a printed gate (`NEEDS_SPEC_APPROVAL`, `NEEDS_APPROVAL`) — stop and ask the
    human explicitly, in the conversation, before proceeding past one.
 6. Before a request that plausibly needs an external capability (reading a PR, searching

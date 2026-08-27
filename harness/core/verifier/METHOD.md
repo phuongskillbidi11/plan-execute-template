@@ -12,6 +12,17 @@ Run `eng verify [plan-dir]` after the Executor reports all tasks `[x]`. This:
 3. Runs the project's test command (`.agent/project.yaml`'s `stack.test_cmd`).
 4. Writes `verify-report.md` with a PASS/FAIL verdict.
 
+## Activation and role verdict (Phase 10)
+
+`eng adapter prompt verifier <plan-dir>` is the recorded activation step. Mechanical `eng
+verify` is not the only gate to `COMPLETED` when `workflow.verifier` is enabled — this role's
+own judgment, recorded via `eng plan verify-review <plan-dir> --verdict PASS|FAIL`, is required
+too. Answer specifically: did the implementation actually satisfy the approved `spec.md`? Are
+`tests.md`'s acceptance criteria genuinely met, not just mechanically green? Is the evidence
+sufficient? Did execution stay in scope? A fresh Claude Code session for this role is
+recommended, where practical, for stronger independence from the Executor's own session — not
+enforced, but worth doing when it's easy.
+
 ## Full tool output
 
 `eng verify`'s report shows a bounded head+tail summary of the test command's output. If

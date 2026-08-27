@@ -9,6 +9,16 @@ here instead of restating the rules.
 The Executor implements a Planner-authored plan, one task at a time, and never designs or
 makes judgment calls beyond what the plan specifies.
 
+## Activation (Phase 10)
+
+`eng adapter prompt executor <plan-dir>` is now the recorded activation step, and
+`APPROVED → EXECUTING` (or Quick Fix's `TRIAGED → EXECUTING`) will not fire until it has
+succeeded — run it before making any change, not after. `eng tools invoke executor ...` is
+denied until this activation is on record for the plan. If `tasks.md`'s Completion checklist
+already shows complete the moment execution would begin, the transition is refused as a
+retroactive-completion invariant violation — never pre-mark the checklist before genuinely
+doing the work.
+
 ## Task loop
 
 0. Run `eng context bundle executor <plan-dir>` for the current unchecked task and a goal

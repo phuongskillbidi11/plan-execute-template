@@ -340,12 +340,30 @@ func buildContextBundle(role, planDir, request string) (string, error) {
 		return "", fmt.Errorf("unknown role: %s", role)
 	}
 
+	// Phase 10: write both the unqualified manifest (last-activation
+	// pointer — byte-identical to pre-Phase-10 behavior for any caller
+	// that doesn't know roles exist, e.g. `eng context manifest <dir>`
+	// with no role argument) and a per-role manifest (never overwritten
+	// by a different role's activation — see spec.md's "Per-role context
+	// manifest evidence"). Same content, two paths.
 	manifestPath := filepath.Join(planDir, "context-manifest.yaml")
 	if err := os.WriteFile(manifestPath, []byte(manifest.String()), 0o644); err != nil {
 		return out.String(), fmt.Errorf("context bundle built but failed to write manifest: %w", err)
 	}
+	roleManifestPath := filepath.Join(planDir, roleManifestFileName(role))
+	if err := os.WriteFile(roleManifestPath, []byte(manifest.String()), 0o644); err != nil {
+		return out.String(), fmt.Errorf("context bundle built but failed to write role manifest: %w", err)
+	}
 	fmt.Fprintf(&out, "\n(context selection recorded in %s)\n", manifestPath)
 	return out.String(), nil
+}
+
+// roleManifestFileName is the per-role context manifest filename — role
+// is always one of the four known role strings by the time this is
+// called (buildContextBundle's own switch above already rejected
+// anything else).
+func roleManifestFileName(role string) string {
+	return "context-manifest-" + role + ".yaml"
 }
 
 func contextBundle(args []string) {
@@ -369,13 +387,20 @@ func contextBundle(args []string) {
 
 func contextManifest(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: eng context manifest <plan-dir>")
+		fmt.Println("Usage: eng context manifest <plan-dir> [role]")
 		os.Exit(1)
 	}
 	planDir, _ := filepath.Abs(args[0])
-	data, err := os.ReadFile(filepath.Join(planDir, "context-manifest.yaml"))
+	// Phase 10: an optional role argument reads that role's own manifest
+	// (never overwritten by a different role's later activation); omitted,
+	// this reads the unqualified file exactly as before Phase 10.
+	fileName := "context-manifest.yaml"
+	if len(args) > 1 {
+		fileName = roleManifestFileName(args[1])
+	}
+	data, err := os.ReadFile(filepath.Join(planDir, fileName))
 	if err != nil {
-		fmt.Println("no context-manifest.yaml found — run `eng context bundle <role> <plan-dir>` first")
+		fmt.Printf("no %s found — run `eng context bundle <role> <plan-dir>` first\n", fileName)
 		os.Exit(1)
 	}
 	fmt.Print(string(data))

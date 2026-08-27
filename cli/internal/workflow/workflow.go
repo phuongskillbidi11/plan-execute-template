@@ -53,6 +53,21 @@ type Facts struct {
 	SpecApproved        bool   // plan.yaml's spec_approved_at is set
 	RequireSpecApproval bool
 	TasksAndTestsReady  bool // tasks.md AND tests.md exist, non-empty, placeholder-free
+
+	// ExecutorActivated is Phase 10's role-runtime fact: has `eng adapter
+	// prompt executor <plan-dir>` actually succeeded for this plan since
+	// its last replan cycle (rolestate.RoleState.CurrentRole == "executor")?
+	// Gates every transition into EXECUTING — see spec.md's "Two new hard
+	// transition gates."
+	ExecutorActivated bool
+
+	// RoleVerificationRequired/RoleVerificationVerdict are Phase 10's
+	// mechanical-vs-role-verification facts. RoleVerificationRequired is
+	// project.Workflow.VerifierEnabled() — Phase 9 built the accessor,
+	// Phase 10 is its first real consumer. RoleVerificationVerdict is
+	// plan.yaml's role_verification.verdict ("" | PASS | FAIL).
+	RoleVerificationRequired bool
+	RoleVerificationVerdict  string
 }
 
 // Decision is the one transition Decide recommends for the current Facts,
@@ -61,8 +76,21 @@ type Facts struct {
 type Decision struct {
 	NextState string
 	Reason    string
-	Action    string // "" | "run_verify"
+	Action    string // "" | "run_verify" | "invariant_violation"
 }
+
+// invariantViolation is the Phase 10 temporal-invariant reason: tasks.md
+// already shows every Completion checklist item checked at the exact
+// moment a transition into EXECUTING would otherwise fire. Under every
+// normal flow this is false (the template's checklist starts unchecked);
+// it being true here means something checked every box before execution
+// legitimately began — the reproduced CredoID-shaped bypass. Decide
+// refuses the transition rather than let the state machine retroactively
+// legitimize already-completed work. See spec.md's temporal invariant
+// section and DECISION_LOG.md Decision 3 (no override flag, by design).
+const invariantViolationReason = "tasks.md already shows complete before execution began — " +
+	"this looks like retroactive completion; uncheck the Completion checklist and let the " +
+	"Executor genuinely complete it under EXECUTING"
 
 // Decide implements the Phase 3 spec.md "Design decisions / Decision 6"
 // transition table exactly. It applies at most one transition per call —
@@ -72,10 +100,16 @@ func Decide(f Facts) Decision {
 	switch f.State {
 	case StateTriaged:
 		if f.IsQuickFix {
-			if f.PlanFilesReady {
-				return Decision{NextState: StateExecuting, Reason: "quick-fix: minimal plan present, skipping review/approval"}
+			if !f.PlanFilesReady {
+				return Decision{NextState: StateTriaged, Reason: "waiting on the minimal quick-fix plan (spec.md + tasks.md + tests.md)"}
 			}
-			return Decision{NextState: StateTriaged, Reason: "waiting on the minimal quick-fix plan (spec.md + tasks.md + tests.md)"}
+			if f.TasksComplete {
+				return Decision{NextState: StateTriaged, Reason: invariantViolationReason, Action: "invariant_violation"}
+			}
+			if !f.ExecutorActivated {
+				return Decision{NextState: StateTriaged, Reason: "waiting on executor role activation (eng adapter prompt executor <plan-dir>)"}
+			}
+			return Decision{NextState: StateExecuting, Reason: "quick-fix: minimal plan present, skipping review/approval"}
 		}
 		if f.PlanningMode == "spec_first" {
 			if !f.SpecReady {
@@ -133,6 +167,12 @@ func Decide(f Facts) Decision {
 		if f.DriftDetected {
 			return Decision{NextState: StateNeedsReplan, Reason: "PLAN_DRIFT_DETECTED before execution started"}
 		}
+		if f.TasksComplete {
+			return Decision{NextState: StateApproved, Reason: invariantViolationReason, Action: "invariant_violation"}
+		}
+		if !f.ExecutorActivated {
+			return Decision{NextState: StateApproved, Reason: "waiting on executor role activation (eng adapter prompt executor <plan-dir>)"}
+		}
 		return Decision{NextState: StateExecuting, Reason: "no drift detected — Executor may begin"}
 
 	case StateExecuting, StateNeedsFix:
@@ -144,6 +184,17 @@ func Decide(f Facts) Decision {
 	case StateVerifying:
 		switch f.VerificationVerdict {
 		case "PASS":
+			if f.RoleVerificationRequired {
+				switch f.RoleVerificationVerdict {
+				case "":
+					return Decision{NextState: StateVerifying, Reason: "mechanical verify PASSed — waiting on Verifier role verdict (eng plan verify-review)"}
+				case "FAIL":
+					if f.RetryExhausted {
+						return Decision{NextState: StateFailed, Reason: "Verifier role rejected the result and the retry budget is exhausted"}
+					}
+					return Decision{NextState: StateNeedsFix, Reason: "Verifier role rejected the result — retry budget remains"}
+				}
+			}
 			return Decision{NextState: StateCompleted, Reason: "eng verify reported PASS"}
 		case "FAIL":
 			if f.RetryExhausted {

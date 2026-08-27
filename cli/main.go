@@ -63,13 +63,14 @@ Commands:
   plan new <name> [--risk <level>]   Scaffold a plan and stamp it with the current git SHA
   plan drift [dir]                   Check whether relevant files changed since planning
   plan retry <dir> <stage>           Track a retry against this plan's budget
+  plan verify-review <dir> --verdict PASS|FAIL   Record the Verifier role's own verdict
   verify [dir]                       Run tests, check the git diff, write verify-report.md
   hooks run <stage>                  Run the configured hooks for a lifecycle stage
   triage "<text>"                    Heuristic risk-level hint (not authoritative)
   workflow start "<text>"            Triage + create a plan, then report its status
   workflow status [dir]              Report a plan's lifecycle state and next action
   workflow advance [dir]             Mechanically apply the next safe transition
-  adapter prompt <role> <dir>        Print the assembled prompt for an agent session
+  adapter prompt <role> <dir>        Compose+record role activation, print prompt+context
   capabilities list                  Report which known tools are on PATH
   capabilities explain <role> <plan-dir> ["<text>"]   Explain tool routing for a request
   tools invoke <role> <capability> <plan-dir> [args...]   Invoke one capability, audited
@@ -78,6 +79,6 @@ Commands:
   context project "<text>"           Show matching docs/src-map.md and docs/gotchas.md sections
   context task <plan-dir>            Show the current task and goal summary
   context bundle <role> <plan-dir>   Compose role-specific context and write a manifest
-  context manifest <plan-dir>        Pretty-print an existing context-manifest.yaml
+  context manifest <plan-dir> [role]  Pretty-print an existing context-manifest(-<role>).yaml
   logs prune [--dry-run]             Apply .agent/logs/ retention (max_files/age/total size)`)
 }

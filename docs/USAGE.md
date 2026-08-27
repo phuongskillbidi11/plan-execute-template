@@ -235,10 +235,10 @@ ends with a printed next command and a stop.
 | `PLANNED` | Full plan present; waiting on review (if this risk level requires it) | `eng adapter prompt plan-reviewer <dir>`, then `eng plan review <dir> --verdict ...` |
 | `REVIEWED` | Review passed or not required | `eng workflow advance` (auto-resolves approval need) |
 | `NEEDS_APPROVAL` | Execution requires human sign-off (`high-risk` or `--requires-approval`) | `eng plan approve <dir>` |
-| `APPROVED` | Drift-checked and clear; Executor may begin | `eng workflow advance` (starts `EXECUTING`) |
+| `APPROVED` | Drift-checked and clear; waiting on executor role activation (Phase 10) | `eng adapter prompt executor <dir>`, then `eng workflow advance` (starts `EXECUTING`) |
 | `EXECUTING` | Executor working through `tasks.md` | `eng adapter prompt executor <dir>` |
-| `VERIFYING` | All tasks checked off; `eng verify` runs automatically on the transition into this state | (automatic) |
-| `COMPLETED` | Verified PASS | none |
+| `VERIFYING` | All tasks checked off; `eng verify` runs automatically on the transition into this state. If `workflow.verifier` is enabled, also waits on the Verifier role's own verdict (Phase 10) | `eng adapter prompt verifier <dir>`, then `eng plan verify-review <dir> --verdict ...` |
+| `COMPLETED` | Mechanical `PASS`, and role verification `PASS` when `workflow.verifier` is enabled | none |
 | `NEEDS_REPLAN` | Review REJECTed, or drift detected before execution started | `eng adapter prompt planner <dir>` |
 | `NEEDS_FIX` | `eng verify` FAILed, retry budget remains | `eng adapter prompt executor <dir>` |
 | `FAILED` | `eng verify` FAILed and the retry budget is exhausted | human decision required |
@@ -256,6 +256,55 @@ individual task is for human/Executor tracking only and is never read by `eng`. 
 task's own `**Status:**` to `[x]` is not enough on its own; check off the Completion checklist
 too. If `eng workflow advance` reports unchecked items, it now names the specific blocking
 line(s) rather than a generic message (fixed in Phase 9 — see `docs/gotchas.md`).
+
+**Task-completion temporal invariant (Phase 10):** if `tasks.md`'s Completion checklist is
+*already* fully checked at the exact moment a transition into `EXECUTING` would otherwise fire
+(`APPROVED → EXECUTING`, or Quick Fix's `TRIAGED → EXECUTING`), `eng workflow advance` refuses
+instead of proceeding — under every normal flow this is false (the checklist starts unchecked);
+it being true means something was marked complete before execution legitimately began. The
+message names this explicitly ("tasks.md already shows complete before execution began — this
+looks like retroactive completion"). There is no override flag — the remediation is to uncheck
+the checklist and let the Executor genuinely complete it under `EXECUTING`. See
+`benchmarks/results/investigation-bypass-blocked.yaml` for the real reproduced-and-fixed case
+this closes.
+
+---
+
+## Role activation
+
+Every `eng adapter prompt <role> <plan-dir>` call is now a **validated, recorded** step, not
+just a prompt printer — Phase 10's "role runtime" answers "what role is active right now, was
+its prompt actually composed, is the current state compatible with that role."
+
+```bash
+eng adapter prompt planner .plans/2026-08-27-my-feature
+```
+
+- **Refuses** (non-zero exit, nothing printed) if the role isn't compatible with the plan's
+  current state — e.g. `executor` while the plan is still `TRIAGED` (non-quick-fix). The state-
+  to-role mapping: `TRIAGED`/`NEEDS_SPEC_APPROVAL`/`SPEC_APPROVED`/`NEEDS_REPLAN` → `planner`;
+  `PLANNED`/`REVIEWED` → `plan-reviewer`; `APPROVED`/`EXECUTING`/`NEEDS_FIX` → `executor`
+  (also `TRIAGED` for a quick-fix plan specifically); `VERIFYING`/`COMPLETED` → `verifier`.
+- **On success**, writes `<plan-dir>/role-state.yaml` (`current_role`, `activated_at`,
+  `activated_for_state`, `prompt_generated_at`, `context_manifest`), a per-role
+  `context-manifest-<role>.yaml` (never overwritten by a different role's later activation —
+  the unqualified `context-manifest.yaml` still exists too, as the last-activation pointer), and
+  a `role_activated` event in `events.jsonl`.
+- A stale activation from before a replan cycle is cleared automatically whenever a plan
+  re-enters `NEEDS_REPLAN` (drift or review rejection) — re-activation is required afterward.
+
+**`eng tools invoke <role> <capability> <plan-dir>`** checks this same record before anything
+else: the invoking role must actually be `role-state.yaml`'s current role for a state that role
+is still compatible with. Claiming a role in the CLI argument is no longer sufficient on its
+own — `eng tools invoke executor ...` is `DENIED` ("role not active for this plan") until `eng
+adapter prompt executor <plan-dir>` has actually succeeded first.
+
+**Verifier session independence** is a documented recommendation, not a technical requirement:
+the same Claude Code session may hold multiple roles across a plan's lifecycle (each transition
+must still be explicit — the prior role's elevated permissions don't carry over, since the
+active-role check above always uses the *current* recorded role). Where practical, running the
+Verifier in a fresh session is recommended for stronger independence, but Phase 10 does not spawn
+or manage sessions — that stays a human/agent choice.
 
 ---
 
@@ -284,7 +333,7 @@ parsing while writing this document.
 | `eng context project "<text>"` | Show matching `docs/src-map.md`/`docs/gotchas.md` sections | `eng context project "auth token check"` |
 | `eng context task <plan-dir>` | Show the current unchecked task + goal summary | `eng context task .plans/2026-08-26-my-feature` |
 | `eng context bundle <role> <plan-dir> ["<text>"]` | Compose a role's full context + write the manifest | `eng context bundle executor .plans/2026-08-26-my-feature` |
-| `eng context manifest <plan-dir>` | Pretty-print an existing `context-manifest.yaml` | `eng context manifest .plans/2026-08-26-my-feature` |
+| `eng context manifest <plan-dir> [role]` | Pretty-print `context-manifest(-<role>).yaml` | `eng context manifest .plans/2026-08-26-my-feature executor` |
 
 ### Planning & lifecycle — *advanced/debug*
 
@@ -297,13 +346,14 @@ parsing while writing this document.
 | `eng plan review <dir> --verdict PASS\|REJECT [--blocking-issues N]` | Record a plan-reviewer verdict | `eng plan review <dir> --verdict PASS` |
 | `eng plan approve <dir> [--by <name>]` | Grant execution-risk approval | `eng plan approve <dir> --by alice` |
 | `eng plan approve-spec <dir> [--by <name>]` | Grant requirements (spec) approval | `eng plan approve-spec <dir> --by alice` |
+| `eng plan verify-review <dir> --verdict PASS\|FAIL [--by <name>] [--notes "..."]` | Record the Verifier role's own independent verdict — distinct from mechanical `eng verify` | `eng plan verify-review <dir> --verdict PASS` |
 | `eng plan escalate <dir> --to <level> [--reason "..."]` | Re-risk a quick-fix plan, reset to `TRIAGED` | `eng plan escalate <dir> --to bug --reason "wider than expected"` |
 | `eng plan block <dir> --reason "..."` | Force state to `BLOCKED` | `eng plan block <dir> --reason "waiting on vendor"` |
 | `eng plan cancel <dir> [--reason "..."]` | Force state to `CANCELLED` | `eng plan cancel <dir>` |
 | `eng workflow start "<text>"` | Triage + `eng plan new` + report status | `eng workflow start "add CSV export"` |
-| `eng workflow status [dir]` | Report a plan's lifecycle state + next action | `eng workflow status <dir>` |
+| `eng workflow status [dir]` | Report a plan's lifecycle state, active/next role, verification status | `eng workflow status <dir>` |
 | `eng workflow advance [dir]` | Apply the next safe state transition | `eng workflow advance <dir>` |
-| `eng adapter prompt <role> <dir> ["<text>"]` | Print the assembled prompt + context bundle for a role | `eng adapter prompt executor <dir>` |
+| `eng adapter prompt <role> <dir> ["<text>"]` | **Activation boundary** (Phase 10) — validates role/state, records activation, prints the assembled prompt + context bundle | `eng adapter prompt executor <dir>` |
 | `eng verify [dir]` | Run tests, check the git diff, write `verify-report.md` | `eng verify <dir>` |
 | `eng hooks run <stage> [plan-dir]` | Run configured lifecycle hooks | `eng hooks run before_execute` |
 
@@ -313,7 +363,13 @@ parsing while writing this document.
 |---|---|---|
 | `eng capabilities list [--verbose] [--role <role>]` | Report which known tools are on PATH | `eng capabilities list --role executor` |
 | `eng capabilities explain <role> <dir> ["<text>"]` | Explain tool routing for a request | `eng capabilities explain executor <dir> "inspect open PRs"` |
-| `eng tools invoke <role> <capability> <dir> [args...]` | Invoke one capability — the only sanctioned path, always policy-checked and audited | `eng tools invoke executor git.status <dir>` |
+| `eng tools invoke <role> <capability> <dir> [args...]` | Invoke one capability — the only sanctioned path, always policy-checked, role-activation-checked, and audited | `eng tools invoke executor git.status <dir>` |
+
+Real capabilities today: `git.status`/`git.diff`/`git.log`/`git.commit`/`git.push`/
+`git.force_push` (hard-denied), `github.repo.read`/`github.pr.read`/`github.issue.read`
+(read-only, via `gh`), `docs.search` (the reference MCP adapter), and `codex.inspect`/
+`codex.review`/`codex.verify` (Phase 10, read-only second-opinion delegation — see
+[Codex delegation](#codex-delegation) below). No write/execute capability exists for Codex.
 
 ### Maintenance
 
@@ -322,6 +378,34 @@ parsing while writing this document.
 | `eng logs prune [--dry-run]` | Apply `.agent/logs/` retention (max files/age/total size) | `eng logs prune --dry-run` |
 
 ---
+
+## Codex delegation
+
+A minimal, read-only second-opinion delegation path (Phase 10) — implemented as a
+`tooladapter.Adapter` exactly like `git`/`github`, not a second coding-agent subsystem, so it
+reuses Phase 7's whole capability/policy/audit machinery for free.
+
+```bash
+eng tools invoke planner codex.inspect <plan-dir> "What does this module actually do?"
+eng tools invoke plan-reviewer codex.review <plan-dir>
+eng tools invoke verifier codex.verify <plan-dir> "Does the diff satisfy the acceptance criteria?"
+```
+
+- `codex.inspect`/`codex.verify` run `codex exec --sandbox read-only "<prompt>"`; `codex.review`
+  runs the real `codex review` command. All three are `READ`-risk — every role's toolbox already
+  includes `codex`, and no role-ceiling change was needed.
+- **No write/execute capability exists.** A future `codex.execute` would need its own capability
+  name, risk tier, and explicit policy decision — never implied by these three.
+- Output goes through the same `writeFullLog`/`summarizeOutput` compaction every other tool
+  invocation uses — bounded in the printed result, full output in `.agent/logs/codex-*.log`,
+  audited via the standard `tool_invocation` event.
+- `eng doctor` distinguishes **installed** (`codex` on PATH) from **wired** (the adapter is
+  registered) from **invokable** (`codex login status` actually succeeds) — not one conflated
+  `available` flag. Every registered adapter's `Tools:` line in `eng doctor` shows all three now,
+  not just Codex's.
+- Claude should not blindly trust Codex's findings — treat them the same way a Plan Reviewer
+  treats a Planner's spec: compare against real repository/system evidence before acting on an
+  important claim.
 
 ## Normal vs. advanced usage
 

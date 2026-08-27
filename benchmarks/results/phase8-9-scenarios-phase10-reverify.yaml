@@ -1,0 +1,109 @@
+scenario: phase8-9-scenarios-phase10-reverify
+phase: 10
+purpose: >
+  Re-run every Phase 8/9 E2E sequence and automated scenario suite whose result could
+  plausibly be affected by Phase 10 (anything touching `eng workflow advance`, `eng verify`,
+  `eng tools invoke`, `eng adapter prompt`), on fresh fixture copies against the Phase 10
+  binary, per this repo's own established convention of recording a new result file rather
+  than silently overwriting prior phase result files.
+
+automated_suite:
+  commands_run:
+    - "go build ./... && go vet ./... && go test ./... (fresh, -count=1, no cache)"
+    - "go test ./... -run TestRouterEvalScenarios -v -count=1"
+  result: PASS
+  notes: >
+    All 25 packages build/vet/test clean with zero failures, including every pre-existing
+    Phase 1-9 test (workflow, planmeta, agent, toolpolicy, tooladapter, skillrouter,
+    skillmatch, skilleval, docsearch, etc.) unmodified except the two documented additions
+    (workflow_test.go's ExecutorActivated fields on two pre-existing tests) noted in Phase
+    10's own tasks.md Task 3. TestRouterEvalScenarios' 5 scenarios (docker-linux-ci,
+    esp32-siemens-modbus, qt-cmake-embedded-linux, cpp-debug, csharp-winforms-rs485) all pass
+    unchanged, confirming skill routing is unaffected by Phase 10.
+
+legacy_v1_regression:
+  fixture: benchmarks/fixtures/legacy (fresh scratch copy)
+  finding: >
+    scripts/load_skill.sh and scripts/plan-executor.sh have zero diff in this phase
+    (confirmed via `git diff --stat scripts/` — empty output) — the raw V1 script path is
+    unaffected by construction, not just by re-test. Re-ran the harness-v2/hybrid path
+    instead, since that is the one that actually executes Phase 10 code.
+  hybrid_mode_e2e:
+    commands_run:
+      - "eng init"
+      - "eng doctor"
+      - "eng workflow start \"Print a friendly greeting on startup.\""
+    observed: >
+      Mode auto-detected as hybrid, pre-existing CLAUDE.md/.plans/skills left untouched
+      (matching Phase 9's legacy-v1-compat.yaml exactly), reached TRIAGED cleanly with the
+      new "Active role: none / Next role: planner" lines correctly appended — no regression,
+      no additional migration step required.
+  result: PASS
+
+quick_fix_e2e:
+  fixture: benchmarks/fixtures/quick-fix (fresh scratch copy)
+  sequence: >
+    eng workflow start "Increase the reconnect timeout from 1000 ms to 1500 ms." (triaged
+    quick-fix, profile triage->execute->verify) -> filled spec.md/tasks.md/tests.md ->
+    advance stayed TRIAGED until minimal-plan content present -> advance fired
+    TRIAGED->EXECUTING (executor already activated, task unchecked - not a retroactive-
+    completion case) -> real edit to main.go (ReconnectTimeoutMS 1000->1500) -> task checked
+    -> advance fired EXECUTING->VERIFYING with a real non-empty git diff and mechanical PASS
+    -> correctly stayed VERIFYING pending Verifier role verdict -> eng adapter prompt
+    verifier + eng plan verify-review --verdict PASS -> advance fired VERIFYING->COMPLETED.
+  extra_steps_vs_phase9: >
+    Exactly one new required call each for executor and verifier activation
+    (eng adapter prompt executor/verifier) plus one eng plan verify-review call — otherwise
+    byte-identical to the Phase 8/9 quick-fix sequence. Quick Fix lightness preserved.
+  result: PASS
+
+spec_first_feature_e2e:
+  fixture: benchmarks/fixtures/feature (fresh scratch copy)
+  sequence: >
+    eng workflow start "Add CSV export for the transaction report." (triaged feature,
+    profile triage->plan->review->execute->verify) -> eng adapter prompt planner -> wrote
+    spec.md -> advance TRIAGED->NEEDS_SPEC_APPROVAL -> eng plan approve-spec -> advance
+    NEEDS_SPEC_APPROVAL->SPEC_APPROVED -> wrote tasks.md/tests.md -> advance
+    SPEC_APPROVED->PLANNED -> eng adapter prompt plan-reviewer (correctly REFUSED when
+    attempted too early at SPEC_APPROVED, succeeded once state reached PLANNED) -> eng plan
+    review --verdict PASS -> advance PLANNED->REVIEWED -> advance REVIEWED->APPROVED
+    (approval not required) -> advance attempt WITHOUT executor activation correctly stayed
+    APPROVED ("waiting on executor role activation") -> eng adapter prompt executor ->
+    advance APPROVED->EXECUTING -> real ExportCSV function added to main.go -> tasks.md
+    Completion checklist checked -> advance EXECUTING->VERYFING with real diff, mechanical
+    PASS -> correctly stayed VERIFYING pending Verifier role verdict -> eng adapter prompt
+    verifier + eng plan verify-review --verdict PASS -> advance VERIFYING->COMPLETED.
+  extra_steps_vs_phase9: >
+    Exactly the three new required activation calls (planner, plan-reviewer, executor,
+    verifier — four total, one per role) plus one eng plan verify-review call. All other
+    commands and their order are identical to the Phase 8/9 spec-first sequence. Confirms the
+    executor-activation gate holds when genuinely un-activated, and clears immediately once
+    activated with no other side effect.
+  result: PASS
+
+investigation_bypass_regression:
+  note: >
+    The core bypass fix itself was re-proven on a fresh fixture copy in Task 9.3 of this
+    phase's own tasks.md — see benchmarks/results/investigation-bypass-blocked.yaml. Not
+    re-run a third time here to avoid duplicating that evidence; cited instead.
+  result: PASS (see linked result file)
+
+codex_adapter_regression:
+  note: >
+    Live-verified once already in Task 8.6 — see
+    benchmarks/results/codex-adapter-live-verification.yaml. Re-confirmed structurally via
+    `go test ./internal/tooladapter/... -count=1` (fresh, above) and via `eng doctor`'s
+    Tools: section during the hybrid_mode_e2e run above, which shows
+    "codex installed=true wired=yes invokable=true [3 capabilities]" — matching the
+    live-verification result exactly, no drift.
+  result: PASS
+
+summary:
+  all_scenarios: PASS
+  regressions_found: 0
+  notes: >
+    Every Phase 8/9 E2E path re-confirmed on fresh fixtures against the Phase 10 binary.
+    The only observable behavior change anywhere in these re-runs is the expected, designed
+    one: one role-activation call required per role transition into EXECUTING or a
+    role-verification-gated VERIFYING->COMPLETED step, everywhere role enforcement applies.
+    No other command, output shape, or terminal state differs from the Phase 8/9 baseline.

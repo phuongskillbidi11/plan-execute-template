@@ -28,6 +28,13 @@ context, resolves relevant skills, writes a plan, and hands it to an Executor.
   tests.md   — exact command + binary pass/fail per test
 ```
 
+## Activation (Phase 10)
+
+`eng adapter prompt planner <plan-dir> "<request text>"` is the recorded activation step, not
+just a prompt printer — run it once per planning session before proceeding. It refuses if the
+plan's current state isn't one Planner is compatible with (see `core/runtime/METHOD.md`'s
+state-to-role mapping).
+
 ## Before writing spec.md
 
 1. Run Triage (see `core/triage/METHOD.md`) to determine the risk level.

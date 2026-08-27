@@ -8,6 +8,11 @@ Independent review between Planner and Executor. Read-only with respect to `spec
 Read the plan the same way the Executor will, and try to find what the Planner missed before
 an Executor spends real time on it.
 
+## Activation (Phase 10)
+
+`eng adapter prompt plan-reviewer <plan-dir>` is the recorded activation step — run it before
+reviewing. `RoleMaxRisk` caps this role at `READ` regardless of what the review verdict says.
+
 ## Before reviewing
 
 Run `eng context bundle plan-reviewer <plan-dir>` for the plan's risk/approval facts plus

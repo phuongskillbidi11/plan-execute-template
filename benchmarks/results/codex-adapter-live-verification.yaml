@@ -1,0 +1,39 @@
+scenario: codex-adapter-live-verification
+phase: 10
+mode: harness-v2
+environment:
+  codex_version: 0.147.0
+  auth_mode: chatgpt
+  doctor_status: "Logged in using ChatGPT"
+doctor_output:
+  command: eng doctor
+  codex_line: "codex      installed=true  wired=yes invokable=true  [3 capabilities]"
+real_invocation:
+  command: >
+    eng tools invoke executor codex.inspect <plan-dir> "In one sentence, what does this
+    repository's go.mod module name say? Do not modify anything."
+  real_codex_output_excerpt: >
+    sandbox: read-only / model: gpt-5.6-sol / exec: Get-Content go.mod (succeeded, 1057ms) /
+    "The `go.mod` module name is `investigationbypassbench`." / tokens used: 4,501
+  exit_code: 0
+  audit_event:
+    type: tool_invocation
+    adapter: codex
+    capability: codex.inspect
+    role: executor
+    result: ALLOWED
+    reason: "read capability, no explicit policy — default-open for READ"
+    log_path: ".agent/logs/tool-codex-<timestamp>.log (real file, confirmed present)"
+role_denial_case:
+  command: eng tools invoke planner codex.inspect <plan-dir> "test"
+  result: "REFUSED (DENIED): role not active for this plan — no activation on record for planner"
+  exit_code: 1
+notes: >
+  A genuinely real, bounded, read-only Codex invocation against the actually-installed,
+  actually-authenticated codex binary in this environment — not a mock or a skipped test. The
+  sandbox was confirmed read-only in Codex's own printed session header. Output was bounded by
+  the existing writeFullLog/summarizeOutput compaction (Phase 4/5/7), audited via the standard
+  tool_invocation event, and denied correctly for a role that hadn't been activated for this
+  plan. No automated `go test` run invokes a real codex exec/review call (kept out of the test
+  suite for speed/determinism/no API cost, per DECISION_LOG.md) — this file is that real
+  end-to-end proof instead.

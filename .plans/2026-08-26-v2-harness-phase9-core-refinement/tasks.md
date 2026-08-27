@@ -366,11 +366,11 @@ real output, not asserted.
 
 ## Task 11 — Git
 
-- [ ] **11.1** Inspect the complete diff (`git status`, `git diff --stat`). Exclude any stray
+- [x] **11.1** Inspect the complete diff (`git status`, `git diff --stat`). Exclude any stray
   compiled binaries, logs, or scratch output the same way Phase 8's `.gitignore` discipline
   required. Confirm no local user paths, credentials, or private dogfooding source were copied
   into the repo.
-- [ ] **11.2** Stage only Phase 9's durable changes (code, tests, skills, fixtures, benchmark
+- [x] **11.2** Stage only Phase 9's durable changes (code, tests, skills, fixtures, benchmark
   scenarios/results, docs, the plan folder itself) and commit locally with the suggested
   message. Do not push.
 

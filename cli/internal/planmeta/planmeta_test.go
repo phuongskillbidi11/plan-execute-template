@@ -29,6 +29,46 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	}
 }
 
+// TestRoleVerificationRoundTrip covers the Phase 10 addition — an
+// old plan.yaml with no role_verification field loads with a zero-value
+// (Verdict "") struct, and a new one round-trips its verdict/notes fully.
+func TestRoleVerificationRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	m := &Meta{
+		Plan:      "2026-08-27-example",
+		RiskLevel: "feature",
+		State:     "VERIFYING",
+		RoleVerification: RoleVerification{
+			Verdict:    "PASS",
+			VerifiedAt: "2026-08-27T10:00:00Z",
+			VerifiedBy: "alice",
+			Notes:      "matches spec",
+		},
+	}
+	if err := Save(dir, m); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RoleVerification.Verdict != "PASS" || got.RoleVerification.VerifiedBy != "alice" {
+		t.Fatalf("round-trip mismatch: %+v", got.RoleVerification)
+	}
+}
+
+func TestRoleVerificationDefaultsToEmptyOnOldPlanYAML(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, FileName), []byte("plan: x\nstate: VERIFYING\n"), 0o644)
+	got, err := Load(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.RoleVerification.Verdict != "" {
+		t.Fatalf("expected empty verdict for a pre-Phase-10 plan.yaml, got %+v", got.RoleVerification)
+	}
+}
+
 func TestDefaultBudget(t *testing.T) {
 	b := DefaultBudget()
 	if b.Build != 2 || b.UnitTest != 2 || b.IntegrationTest != 1 {

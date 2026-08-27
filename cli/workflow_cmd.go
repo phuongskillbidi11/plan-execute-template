@@ -11,6 +11,7 @@ import (
 
 	"eng/internal/planmeta"
 	"eng/internal/project"
+	"eng/internal/rolestate"
 	"eng/internal/workflow"
 )
 
@@ -97,6 +98,19 @@ func workflowStatus(args []string) {
 	}
 	fmt.Println()
 
+	isQuickFix := meta.RiskLevel == "quick-fix"
+	rs, _ := rolestate.Load(planDir)
+	activeRole := "none"
+	if rs != nil && rs.CurrentRole != "" {
+		activeRole = rs.CurrentRole
+	}
+	nextRole := rolestate.NextRole(meta.State, isQuickFix)
+	if nextRole == "" {
+		nextRole = "none"
+	}
+	fmt.Printf("Active role:   %s\n", activeRole)
+	fmt.Printf("Next role:     %s\n", nextRole)
+
 	facts, err := gatherFacts(planDir, meta)
 	if err != nil {
 		fmt.Println("error gathering state:", err)
@@ -104,7 +118,25 @@ func workflowStatus(args []string) {
 	}
 	decision := workflow.Decide(facts)
 	fmt.Printf("Next:          %s\n", decision.Reason)
+
+	if meta.State == workflow.StateVerifying {
+		fmt.Printf("Mechanical verification: %s\n", verdictOrPending(meta.Verification.Verdict))
+		if facts.RoleVerificationRequired {
+			fmt.Printf("Role verification:       %s\n", verdictOrPending(meta.RoleVerification.Verdict))
+		} else {
+			fmt.Println("Role verification:       not required (workflow.verifier disabled)")
+		}
+	}
 	printUncheckedChecklistLines(meta.State, planDir)
+}
+
+// verdictOrPending renders an empty verdict string as "pending" rather
+// than a blank line — used by workflowStatus's VERIFYING-state detail.
+func verdictOrPending(verdict string) string {
+	if verdict == "" {
+		return "pending"
+	}
+	return verdict
 }
 
 func workflowAdvance(args []string) {
@@ -146,6 +178,15 @@ func workflowAdvance(args []string) {
 		os.Exit(1)
 	}
 	planmeta.AppendEvent(planDir, "state_changed", meta.State)
+
+	// Phase 10: a stale role activation from before a replan cycle must not
+	// satisfy the executor-activation gate afterward — see spec.md's
+	// role-state invalidation rule.
+	if meta.State == workflow.StateNeedsReplan {
+		if err := rolestate.Reset(planDir); err != nil {
+			fmt.Println("warning: failed to reset role-state.yaml on replan:", err)
+		}
+	}
 
 	if decision.Action == "run_verify" {
 		fmt.Println("Running eng verify automatically...")
@@ -216,13 +257,21 @@ func gatherFacts(planDir string, meta *planmeta.Meta) (workflow.Facts, error) {
 	reviewRequired := meta.RiskLevel == "architecture" || meta.RiskLevel == "high-risk"
 	planningMode := "auto_plan"
 	requireSpecApproval := true
+	roleVerificationRequired := true
 	if cfg, err := project.Load(repoRoot); err == nil {
 		reviewRequired = reviewRequired || cfg.Workflow.PlanReviewEnabled()
 		planningMode = cfg.Workflow.PlanningModeOrDefault()
 		requireSpecApproval = cfg.Workflow.RequireSpecApprovalOrDefault()
+		roleVerificationRequired = cfg.Workflow.VerifierEnabled()
 	}
 
 	drifted, _, _ := checkDrift(planDir)
+
+	isQuickFix := meta.RiskLevel == "quick-fix"
+	executorActivated := false
+	if rs, err := rolestate.Load(planDir); err == nil {
+		executorActivated = rs.CurrentRole == "executor"
+	}
 
 	return workflow.Facts{
 		State:               meta.State,
@@ -236,12 +285,16 @@ func gatherFacts(planDir string, meta *planmeta.Meta) (workflow.Facts, error) {
 		VerificationVerdict: meta.Verification.Verdict,
 		RetryExhausted:      meta.Retry.UnitTest > meta.RetryBudget.UnitTest || meta.Retry.Build > meta.RetryBudget.Build || meta.Retry.IntegrationTest > meta.RetryBudget.IntegrationTest,
 
-		IsQuickFix:          meta.RiskLevel == "quick-fix",
+		IsQuickFix:          isQuickFix,
 		PlanningMode:        planningMode,
 		SpecReady:           specReady(planDir),
 		SpecApproved:        meta.SpecApprovedAt != "",
 		RequireSpecApproval: requireSpecApproval,
 		TasksAndTestsReady:  tasksAndTestsReady(planDir),
+
+		ExecutorActivated:        executorActivated,
+		RoleVerificationRequired: roleVerificationRequired,
+		RoleVerificationVerdict:  meta.RoleVerification.Verdict,
 	}, nil
 }
 

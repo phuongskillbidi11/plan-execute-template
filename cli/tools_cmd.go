@@ -9,6 +9,7 @@ import (
 	"eng/internal/mcpregistry"
 	"eng/internal/planmeta"
 	"eng/internal/project"
+	"eng/internal/rolestate"
 	"eng/internal/tooladapter"
 	"eng/internal/toolcap"
 	"eng/internal/toolpolicy"
@@ -32,6 +33,7 @@ func registeredAdapters(repoRoot string) []tooladapter.Adapter {
 	adapters := []tooladapter.Adapter{
 		tooladapter.NewGitAdapter(capabilities.Detect("git")),
 		tooladapter.NewGitHubAdapter(capabilities.Detect("gh")),
+		tooladapter.NewCodexAdapter(capabilities.Detect("codex")),
 	}
 
 	servers, _ := mcpregistry.Load(filepath.Join(harnessDir(), "mcp", "servers.yaml"))
@@ -95,6 +97,33 @@ func toolsInvoke(args []string) {
 	if !owner.Available() {
 		fmt.Printf("adapter %q is not available\n", owner.Name())
 		os.Exit(1)
+	}
+
+	// Phase 10: the invoking role must actually be this plan's currently
+	// activated role, and the current workflow state must still be one
+	// that role is compatible with — closes the "self-narrated role" gap
+	// (claiming role=executor in the CLI call used to be sufficient on its
+	// own; it no longer is). Checked before toolpolicy.Decide, so a
+	// mismatch never even reaches the adapter-toolbox/risk-ceiling/policy
+	// chain. See spec.md's "Tool-call enforcement."
+	if rs, rsErr := rolestate.Load(planDir); rsErr == nil {
+		ok, reason := rolestate.AllowedForState(role, meta.State, meta.RiskLevel == "quick-fix")
+		denyReason := ""
+		switch {
+		case rs.CurrentRole != role:
+			denyReason = "role not active for this plan — no activation on record for " + role + " (run `eng adapter prompt " + role + " <plan-dir>` first)"
+		case !ok:
+			denyReason = "role not active for this state — " + reason
+		}
+		if denyReason != "" {
+			audit := map[string]interface{}{
+				"adapter": owner.Name(), "capability": capability, "role": role,
+				"result": string(toolpolicy.Denied), "reason": denyReason,
+			}
+			planmeta.AppendStructuredEvent(planDir, "tool_invocation", audit)
+			fmt.Printf("REFUSED (%s): %s\n", toolpolicy.Denied, denyReason)
+			os.Exit(1)
+		}
 	}
 
 	decision := toolpolicy.Decide(capability, risk, owner.Name(), role, policy, approved)

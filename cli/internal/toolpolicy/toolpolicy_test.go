@@ -36,6 +36,29 @@ func TestDecideRoleRiskCeilingDenied(t *testing.T) {
 	}
 }
 
+// TestDecideRoleRiskCeilingDeniedForPlanReviewer is the direct regression
+// test for Phase 10 spec.md's acceptance criterion "A Plan Reviewer
+// cannot perform implementation mutation" — plan-reviewer's RoleMaxRisk
+// is READ, same as planner, unaffected/unweakened by Phase 10 (Phase 10
+// adds a role-vs-state check ahead of this one; it doesn't loosen this
+// existing Phase 7 guarantee).
+func TestDecideRoleRiskCeilingDeniedForPlanReviewer(t *testing.T) {
+	d := Decide("git.push", toolcap.RiskWrite, "git", "plan-reviewer", Policy{}, true)
+	if d.Verdict != Denied {
+		t.Fatalf("expected plan-reviewer's READ ceiling to deny WRITE, got %+v", d)
+	}
+}
+
+// TestDecideRoleRiskCeilingDeniedForVerifier is the direct regression test
+// for "Verifier cannot mutate implementation" — verifier's RoleMaxRisk is
+// READ.
+func TestDecideRoleRiskCeilingDeniedForVerifier(t *testing.T) {
+	d := Decide("git.push", toolcap.RiskWrite, "git", "verifier", Policy{}, true)
+	if d.Verdict != Denied {
+		t.Fatalf("expected verifier's READ ceiling to deny WRITE, got %+v", d)
+	}
+}
+
 func TestDecideRequireApprovalNotYetApproved(t *testing.T) {
 	p := Policy{RequireApproval: []string{"github.issue.comment"}}
 	d := Decide("github.issue.comment", toolcap.RiskWrite, "github", "executor", p, false)

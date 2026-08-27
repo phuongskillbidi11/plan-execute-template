@@ -36,6 +36,17 @@ type Verification struct {
 	VerifiedAt string `yaml:"verified_at,omitempty"`
 }
 
+// RoleVerification is the Phase 10 Verifier role's own independent
+// verdict — deliberately separate from Verification above (the
+// mechanical eng verify result). See spec.md's "Mechanical verification
+// vs. role verification" section.
+type RoleVerification struct {
+	Verdict    string `yaml:"verdict,omitempty"` // PASS | FAIL
+	VerifiedAt string `yaml:"verified_at,omitempty"`
+	VerifiedBy string `yaml:"verified_by,omitempty"`
+	Notes      string `yaml:"notes,omitempty"`
+}
+
 type Meta struct {
 	Plan        string        `yaml:"plan"`
 	RiskLevel   string        `yaml:"risk_level"` // quick-fix | bug | feature | architecture | high-risk
@@ -51,6 +62,10 @@ type Meta struct {
 	ApprovedBy       string       `yaml:"approved_by,omitempty"`
 	Review           Review       `yaml:"review,omitempty"`
 	Verification     Verification `yaml:"verification,omitempty"`
+
+	// RoleVerification is the Verifier role's own recorded verdict —
+	// eng plan verify-review writes it. See RoleVerification's own doc.
+	RoleVerification RoleVerification `yaml:"role_verification,omitempty"`
 
 	// SpecApprovedAt/By are entirely separate from ApprovedAt/By above:
 	// this pair means "the requirements in spec.md are approved," never

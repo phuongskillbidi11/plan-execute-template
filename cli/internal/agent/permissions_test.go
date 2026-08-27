@@ -65,6 +65,20 @@ func TestRoleMayUseGhBinaryNameInEveryRolesToolbox(t *testing.T) {
 	}
 }
 
+// TestRoleMayUseCodexInEveryRolesToolbox is the direct regression test
+// for Phase 10 spec.md's acceptance criteria: Planner (codex.inspect),
+// Plan Reviewer (codex.review), and Verifier (codex.verify) must each be
+// able to use the Codex adapter — every Codex capability is READ-risk, so
+// the toolbox is the only gate that matters here (DECISION_LOG.md
+// Decision 8).
+func TestRoleMayUseCodexInEveryRolesToolbox(t *testing.T) {
+	for _, role := range []string{"planner", "plan-reviewer", "executor", "verifier"} {
+		if !RoleMayUse(role, "codex") {
+			t.Fatalf("expected %s to have codex in its toolbox", role)
+		}
+	}
+}
+
 func TestRoleMaxRiskPlannerReadOnly(t *testing.T) {
 	if !RoleMayInvokeRisk("planner", toolcap.RiskRead) {
 		t.Fatal("expected planner to invoke READ")

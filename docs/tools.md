@@ -102,6 +102,27 @@ without a live MCP JSON-RPC connection, which is out of Phase 7's scope. A futur
 server needs one new registry entry and one new `tooladapter.Adapter` implementation
 matched by name in `registeredAdapters` (`cli/tools_cmd.go`) — not a new subsystem.
 
+## The Codex adapter — read-only second-opinion delegation (Phase 10)
+
+`tooladapter.CodexAdapter` follows exactly the same shape as `GitAdapter`/`GitHubAdapter` —
+three `READ`-risk capabilities (`codex.inspect`, `codex.review`, `codex.verify`), verified
+against the real, installed `codex` CLI rather than guessed:
+`codex exec --sandbox read-only "<prompt>"` for inspect/verify, the top-level `codex review`
+command for review. No write/execute capability exists — a future `codex.execute` needs its own
+capability, risk tier, and policy decision, never implied by these three. Every role's toolbox
+includes `codex` (`agent.RolePermissions`) since all three capabilities are `READ` and every
+role's existing risk ceiling already permits `READ` — see
+`.plans/2026-08-27-v2-harness-phase10-role-enforcement/DECISION_LOG.md` Decision 8.
+
+`CodexAdapter.Doctor()` runs `codex login status` (~0.3s, no network round-trip needed for a
+cached-credential check, verified directly) — this is what distinguishes **installed**
+(`codex` on PATH) from **invokable** (actually authenticated and usable). **Wired** means the
+adapter is registered in `registeredAdapters` — trivially true for anything `eng doctor`/
+`eng tools invoke` can see at all. `eng doctor`'s `Tools:` section reports all three states for
+*every* adapter now, not just Codex — a generic fix rather than a special case, since "the
+binary exists" and "the harness can actually invoke it for something useful" were conflated
+into one `available` flag for every adapter before Phase 10, not just Codex.
+
 ## Inspecting routing
 
 ```bash
@@ -110,8 +131,8 @@ eng capabilities explain <role> <plan-dir> ["<request text>"]
 
 Shows what the skills selected for that request would need, and the routing verdict
 (`ALLOWED`/`NEEDS_APPROVAL`/`BLOCKED`) with a reason for each. `eng doctor`'s `Tools:`
-section shows a bounded, secret-free summary (name, availability, capability count) for
-every registered adapter.
+section shows a bounded, secret-free summary (name, installed/wired/invokable, capability
+count) for every registered adapter.
 
 ## Invoking a capability
 
@@ -119,13 +140,17 @@ every registered adapter.
 eng tools invoke <role> <capability> <plan-dir> [args...]
 ```
 
-The only sanctioned invocation path — `toolpolicy.Decide` always runs first; a refusal
-(`DENIED`/`NEEDS_APPROVAL`) writes a compact audit event and exits non-zero *before*
-touching the adapter. On success, the adapter's full output goes to `.agent/logs/tool-*.log`
-(reusing the same `writeFullLog`/`summarizeOutput` compaction Phase 4/5 already established
-for test output) and a bounded `tool_invocation` event — `adapter`, `capability`, `role`,
-`result`, `reason`, `log_path` — is appended to the plan's `events.jsonl` via the existing
-`planmeta.AppendStructuredEvent`. Raw arguments/output never go into the event itself.
+The only sanctioned invocation path — Phase 10 adds one check ahead of everything else: the
+invoking role must actually be `role-state.yaml`'s currently-activated role for a workflow state
+that role is still compatible with (`rolestate.AllowedForState`) — see `docs/ARCHITECTURE.md`'s
+"Role runtime enforcement" section for the full design. Only once that passes does
+`toolpolicy.Decide` run; a refusal from either check (`DENIED`/`NEEDS_APPROVAL`) writes a
+compact audit event and exits non-zero *before* touching the adapter. On success, the adapter's
+full output goes to `.agent/logs/tool-*.log` (reusing the same `writeFullLog`/`summarizeOutput`
+compaction Phase 4/5 already established for test output) and a bounded `tool_invocation` event
+— `adapter`, `capability`, `role`, `result`, `reason`, `log_path` — is appended to the plan's
+`events.jsonl` via the existing `planmeta.AppendStructuredEvent`. Raw arguments/output never go
+into the event itself.
 
 ## Adding a new adapter
 

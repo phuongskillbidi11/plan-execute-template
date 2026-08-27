@@ -64,11 +64,21 @@ func cmdDoctor(args []string) {
 	adapters := registeredAdapters(dir)
 	fmt.Println("\nTools:")
 	for _, a := range adapters {
-		status := "unavailable"
-		if a.Available() {
-			status = "available"
+		// Phase 10: installed (binary on PATH) / wired (adapter registered
+		// — always yes for anything reaching this loop) / invokable
+		// (Doctor() actually succeeds, e.g. authenticated) are kept
+		// distinct — a generic "available" flag conflates "the binary
+		// exists" with "the harness can actually invoke it for something
+		// useful" (see spec.md's Codex gap analysis).
+		installed := a.Available()
+		invokable := false
+		if installed {
+			if _, err := a.Doctor(); err == nil {
+				invokable = true
+			}
 		}
-		fmt.Printf("  %-10s %-12s [%d capabilities]\n", a.Name(), status, len(a.Capabilities()))
+		fmt.Printf("  %-10s installed=%-5v wired=yes invokable=%-5v [%d capabilities]\n",
+			a.Name(), installed, invokable, len(a.Capabilities()))
 	}
 
 	fmt.Println("\nCapabilities:")

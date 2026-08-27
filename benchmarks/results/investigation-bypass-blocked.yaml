@@ -1,0 +1,45 @@
+scenario: investigation-bypass-blocked
+phase: 10
+mode: harness-v2
+fixture: benchmarks/fixtures/investigation-bypass
+fix: "P1 — role runtime enforcement (executor-activation gate + temporal invariant)"
+before:
+  sequence: >
+    Plan advanced cleanly to APPROVED; tasks.md's bottom Completion checklist hand-checked to
+    [x] while still APPROVED (simulating real work that happened outside the harness).
+    eng workflow advance x2.
+  result: >
+    APPROVED -> EXECUTING (no drift — the checklist edit produces no tracked-file diff), then
+    immediately EXECUTING -> VERIFYING -> COMPLETED in the very next call. Mechanical eng
+    verify's own report showed an EMPTY git diff since the plan's git_sha — zero actual
+    execution ever happened, yet the plan reached COMPLETED with a PASS verdict.
+  source: this file's own Task 1 reproduction (.plans/2026-08-27-v2-harness-phase10-role-enforcement/tasks.md)
+after:
+  sequence: >
+    Identical setup (fresh fixture copy) — advanced cleanly to APPROVED, tasks.md pre-checked
+    while still APPROVED, eng workflow advance.
+  result: >
+    Stays in APPROVED. Reason: "tasks.md already shows complete before execution began — this
+    looks like retroactive completion; uncheck the Completion checklist and let the Executor
+    genuinely complete it under EXECUTING." Repeated eng workflow advance calls do not
+    progress past this — the block is persistent, not a one-time warning.
+  remediation_verified: >
+    Unchecking tasks.md, then running `eng adapter prompt executor <plan-dir>` (the activation
+    boundary) followed by `eng workflow advance`, correctly transitions APPROVED -> EXECUTING —
+    proving the fix blocks only the anomalous retroactive-completion shape, not legitimate
+    execution.
+verification:
+  unit_tests: >
+    cli/internal/workflow/workflow_test.go —
+    TestApprovedInvariantViolationBlocksRetroactiveCompletion,
+    TestQuickFixInvariantViolationBlocksRetroactiveCompletion,
+    TestApprovedStaysApprovedUntilExecutorActivated,
+    TestApprovedTransitionsOnceActivatedAndNotPreComplete — all PASS.
+  real_binary: "confirmed above, against a fresh fixture copy, not the same scratch dir used for the original reproduction."
+notes: >
+  This is the direct, real-binary proof that Phase 10's primary goal — "workflow state
+  transitions happen before work, not after work" — is now actually true, not merely
+  documented. The harness cannot prevent a premature file edit from happening (see
+  spec.md's enforcement-boundary section — that's structurally outside a CLI harness's
+  process boundary), but it now provably refuses to let the state machine retroactively
+  legitimize one once it's detected.

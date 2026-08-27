@@ -123,6 +123,68 @@ command and a stop.
 
 See [`docs/USAGE.md`](USAGE.md#workflow-states) for the full state table and transition rules.
 
+## Role runtime enforcement (Phase 10)
+
+Before Phase 10, `Planner → Plan Reviewer → Executor → Verifier` was a documented convention —
+four `core/*/METHOD.md` prose files an agent was expected to follow, with nothing in code
+checking that it actually did. Real dogfooding found the state machine could be advanced
+*after* the real work had already happened (a plan reached `COMPLETED` with a PASS verdict and
+an **empty git diff**, because `tasks.md`'s completion checklist had been marked before
+`EXECUTING` was ever entered) — the workflow was descriptive, not controlling. Phase 10 closes
+this with two small, additive mechanisms:
+
+**A persisted role runtime model** (`cli/internal/rolestate`, one file per plan,
+`role-state.yaml`): `current_role`, `activated_at`, `activated_for_state`,
+`prompt_generated_at`, `context_manifest`. A pure, deterministic state-to-role table
+(`rolestate.AllowedForState`/`NextRole`) answers "is this role compatible with the current
+workflow state" — the same table drives both the activation boundary below and `eng workflow
+status`'s `Active role:`/`Next role:` lines.
+
+**`eng adapter prompt <role> <plan-dir>` is the activation boundary**, not a new command — every
+`core/*/METHOD.md` file already instructs running it before acting in a role, so making that
+existing call validate and record the activation required no new command surface. A role/state
+mismatch refuses (fail closed, non-zero exit, no prompt printed) before anything is composed;
+success writes `role-state.yaml`, a per-role `context-manifest-<role>.yaml` (never overwritten
+by a different role's later activation — the unqualified `context-manifest.yaml` still exists
+as the last-activation pointer), and a `role_activated` event.
+
+**Two new hard gates in `workflow.Decide`:**
+1. `APPROVED → EXECUTING` (and Quick Fix's `TRIAGED → EXECUTING`) now requires the executor role
+   to have been activated first — `Facts.ExecutorActivated`.
+2. If `tasks.md`'s Completion checklist is *already* fully checked at the exact instant a
+   transition into `EXECUTING` would otherwise fire, `Decide` refuses with
+   `Action: "invariant_violation"` instead of proceeding — under every normal flow this is
+   false (the checklist starts unchecked); it being true is the reproduced bypass signature.
+   No override flag exists; remediation is to uncheck the checklist and let the Executor
+   genuinely complete it under `EXECUTING`.
+
+**Mechanical verification and role verification are now genuinely separate.** `eng verify`
+(git diff / build / test) still runs automatically on `EXECUTING → VERIFYING`, unchanged. When
+`workflow.verifier` resolves enabled (Phase 9's `VerifierEnabled()` accessor — Phase 10 is its
+first real consumer), `VERIFYING → COMPLETED` additionally requires `eng plan verify-review
+<plan-dir> --verdict PASS`, the Verifier role's own independent judgment
+(`plan.yaml`'s `role_verification` field, distinct from the mechanical `verification` field).
+Disabled, `COMPLETED` is reachable on mechanical `PASS` alone — byte-identical to Phase 9.
+
+**What this does and does not enforce — read before assuming more than is true:**
+
+| | Enforced | Instructional only |
+|---|---|---|
+| `eng tools invoke <role> <capability> <plan-dir>` | Yes — checks `role-state.yaml`'s current role *and* state compatibility before `toolpolicy.Decide` even runs | — |
+| `eng adapter prompt <role> <plan-dir>` | Yes — refuses on role/state mismatch, records success | — |
+| `eng workflow advance`'s state transitions | Yes — the two new gates above | — |
+| A Claude Code session's own native tools (Read/Edit/Write/Bash/browser-automation MCP tools) | — | **Not enforceable.** `eng` is a CLI a session *chooses* to invoke; there is no wrapper, sandbox, or daemon interposed on a session's own tool calls. A session that edits a file directly while `APPROVED` cannot be stopped by anything in this repo. |
+
+Given that boundary, Phase 10's actual guarantee is precisely calibrated: the harness cannot
+prevent a premature edit from happening, but it now provably refuses to let the state machine
+retroactively legitimize one once detected — see
+[`benchmarks/results/investigation-bypass-blocked.yaml`](../benchmarks/results/investigation-bypass-blocked.yaml)
+for the real before/after proof. `eng doctor`'s `Tools:` section reflects the same honesty
+principle generically: every adapter reports `installed`/`wired`/`invokable` as three distinct
+booleans, not one conflated `available` flag.
+
+Full command reference: [`docs/USAGE.md`](USAGE.md#role-activation).
+
 ## Tool / capability model (Phase 7)
 
 Full detail lives in [`docs/tools.md`](tools.md); summary:
@@ -137,10 +199,15 @@ Full detail lives in [`docs/tools.md`](tools.md); summary:
   [`docs/tools.md`](tools.md#project-tool-policy-tools).
 - `eng tools invoke` is the only sanctioned invocation path: it always runs `toolpolicy.Decide`
   first, and a refusal writes an audit event and exits non-zero *before* touching the adapter.
-- Today's real adapters: `git`, `github` (read-only, via the `gh` CLI), and a deterministic
-  reference MCP adapter (`docs-search`, greps `docs/*.md` locally — no live network transport).
-  **No live MCP JSON-RPC transport, no tool marketplace, and no write adapter for
-  PLC/Modbus/OPC UA exists yet** — see [Known Limitations in the README](../README.md#known-limitations).
+  Phase 10 adds one more check ahead of `toolpolicy.Decide`: the invoking role must actually be
+  the plan's currently-activated role (`role-state.yaml`) — closes the "claim any role in the
+  CLI argument" gap the role-vs-capability checks alone never covered.
+- Today's real adapters: `git`, `github` (read-only, via the `gh` CLI), `codex` (read-only —
+  `codex.inspect`/`codex.review`/`codex.verify`, Phase 10's second-opinion delegation adapter,
+  no write capability), and a deterministic reference MCP adapter (`docs-search`, greps
+  `docs/*.md` locally — no live network transport). **No live MCP JSON-RPC transport, no tool
+  marketplace, and no write adapter for PLC/Modbus/OPC UA exists yet** — see
+  [Known Limitations in the README](../README.md#known-limitations).
 
 ## Security / safety model
 
@@ -150,7 +217,13 @@ Full detail lives in [`docs/tools.md`](tools.md); summary:
   anything `DESTRUCTIVE`/`HIGH_RISK` (e.g. `git.force_push`) is hard-denied at the policy layer
   regardless of role or project config.
 - **Verifier never silently fixes** — its context bundle exposes only `write_scope`; it reports
-  a verdict (`PASS`/`FAIL`) and never edits files.
+  a verdict (`PASS`/`FAIL`) and never edits files. `RoleMaxRisk` caps it at `READ`, same as
+  Planner/Plan Reviewer — it cannot invoke a `WRITE`-or-above capability regardless of what its
+  own role verdict says.
+- **A role must be activated to invoke a tool as that role** (Phase 10) — `eng tools invoke
+  executor ...` is denied unless `eng adapter prompt executor <plan-dir>` has actually succeeded
+  for that plan since its last replan cycle. Claiming a role in the CLI argument is no longer
+  sufficient on its own.
 - **Approval is one field, reused consistently** — `plan.yaml`'s `approved_at` is both the
   execution-risk approval gate (`eng plan approve`) and the same signal `tools.require_approval`
   checks. There's no separate, easy-to-forget tool-approval concept.
@@ -164,9 +237,11 @@ Full detail lives in [`docs/tools.md`](tools.md); summary:
 
 ## Current maturity
 
-**Internal dogfooding / early team use** — not production-hardened. Phase 8's benchmark suite
-(`benchmarks/`) ran real `eng`/V1 commands across 8 categories and found the core safety, skill
-routing, and legacy-compatibility guarantees hold, while surfacing three concrete, unfixed
-gaps — see [`benchmarks/SCORECARD.md`](../benchmarks/SCORECARD.md) and
+**Internal dogfooding / team-usable beta** — not production-hardened. Phase 8's benchmark suite
+found and Phase 9 fixed every real-world gap it surfaced; real dogfooding after that found the
+workflow state machine could be advanced after work had already happened outside it (see
+[Role runtime enforcement](#role-runtime-enforcement-phase-10) above) — fixed in Phase 10, with
+a real reproduced-and-blocked proof, not just a design claim. See
+[`benchmarks/SCORECARD.md`](../benchmarks/SCORECARD.md) and
 [`benchmarks/BACKLOG.md`](../benchmarks/BACKLOG.md) for the full evidence, and the README's
-[Known Limitations](../README.md#known-limitations) for the short version.
+[Known Limitations](../README.md#known-limitations) for what's still genuinely open.

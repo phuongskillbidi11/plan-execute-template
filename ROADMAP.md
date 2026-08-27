@@ -5,11 +5,14 @@ context routing, natural-language runtime, multi-domain skill ecosystem, audited
 runtime). Phase 8 validated it with a real benchmark suite instead of assuming it worked. Phase
 9 fixed everything Phase 8 found, plus two more real defects found via subsequent dogfooding,
 and added real-world skill coverage (C#/.NET desktop, Qt/CMake, serial/protocol engineering,
-embedded Linux, reverse engineering). See [`README.md`](README.md) for what's implemented today
-and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for how it fits together. The detailed design
-record for each phase lives in its own `.plans/YYYY-MM-DD-v2-harness-*/spec.md` and
-`DECISION_LOG.md` — this file stays a short, current-reality summary, not a phase-by-phase
-archive.
+embedded Linux, reverse engineering). Phase 10 turned the Planner/Plan Reviewer/Executor/
+Verifier lifecycle from a documented convention into a runtime-enforced one — role activation
+is now validated and recorded, and the state machine can no longer retroactively legitimize
+work that happened outside it — and added a minimal, read-only Codex delegation adapter. See
+[`README.md`](README.md) for what's implemented today and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+for how it fits together. The detailed design record for each phase lives in its own
+`.plans/YYYY-MM-DD-v2-harness-*/spec.md` and `DECISION_LOG.md` — this file stays a short,
+current-reality summary, not a phase-by-phase archive.
 
 ## Where things stand
 
@@ -18,20 +21,26 @@ Adequate, 0/10 Weak, 0 P0 (blocking) backlog items — decision `READY_TO_EXPAND
 [`benchmarks/SCORECARD.md`](benchmarks/SCORECARD.md)). Phase 9 closed all three Phase 8
 refinement items (Quick Fix triage misclassification, doc-context over-matching, the dual
 `tasks.md` completion-convention confusion) plus two more found during real dogfooding
-(RS485-implies-PLC skill-routing false positive, global/local duplicate skill resolution) — see
-[`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md) for the full evidence trail on each.
+(RS485-implies-PLC skill-routing false positive, global/local duplicate skill resolution).
+Phase 10 closed a P1 architectural gap found during real dogfooding on an actual investigation
+workflow: the workflow state machine could be advanced after real work had already happened
+outside it — see [`benchmarks/results/investigation-bypass-blocked.yaml`](benchmarks/results/investigation-bypass-blocked.yaml)
+for the real reproduced-and-fixed proof. See [`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md)
+for the full evidence trail on every closed item.
 
 ## Now: continued real-world dogfooding
 
-Use the harness on real, non-benchmark work across the newly-covered project types (C#/.NET
-desktop, Qt/CMake, embedded Linux) and any others that come up, before expanding scope further.
-Feed anything that surfaces — a misrouted skill, an approval-friction pattern, a context bundle
-that's too large in practice — back into `benchmarks/BACKLOG.md` the same way Phases 8–9 did,
-with evidence, not assertion. Two known, low-priority latent risks from Phase 9's own dogfooding
-are already tracked there rather than fixed speculatively: `automation/plc`'s bare `automation`
-tag (same class of bug as the RS485 fix, but nothing currently exercises it), and the inherent
-budget-vs-breadth tension when a single request genuinely concerns more skills than the default
-budget allows.
+Use the harness — including its now-enforced role lifecycle and the new Codex delegation path —
+on real, non-benchmark work across the newly-covered project types (C#/.NET desktop, Qt/CMake,
+embedded Linux) and any others that come up, before expanding scope further. Feed anything that
+surfaces — a misrouted skill, an approval-friction pattern, a context bundle that's too large in
+practice, a role-activation edge case — back into `benchmarks/BACKLOG.md` the same way
+Phases 8–10 did, with evidence, not assertion. Known, low-priority latent risks already tracked
+there rather than fixed speculatively: `automation/plc`'s bare `automation` tag (same class of
+bug as the RS485 fix, but nothing currently exercises it), the inherent budget-vs-breadth
+tension when a single request genuinely concerns more skills than the default budget allows,
+and the lack of fresh-session isolation for the Verifier role (recommended in docs, not
+enforced).
 
 ## Later: MCP / skill distribution expansion
 
