@@ -1,0 +1,123 @@
+scenario: phase10-1-bootstrap-verified
+phase: 10.1
+purpose: >
+  Verify the eng start runtime bootstrap fix (--append-system-prompt with a trusted,
+  machine-generated harness identity) closes the real dogfooding-found gap: a fresh,
+  harness-launched Claude Code session had no way to learn the Global Engineering Harness
+  existed, and concluded it was a standard, unharnessed session.
+
+automated_suite:
+  commands_run:
+    - "go build ./... && go vet ./... && go test ./... -count=1 (fresh, no cache)"
+    - "go test ./... -run TestRouterEvalScenarios -v -count=1"
+    - "go test ./internal/workflow/... -run 'TestApproved|TestQuickFix|TestVerifying' -v -count=1"
+    - "go test ./internal/rolestate/... -v -count=1"
+    - "go test ./internal/tooladapter/... -v -count=1"
+  result: PASS
+  notes: >
+    All 25 packages build/vet/test clean. Every Phase 10 role-enforcement test (executor
+    activation gate, temporal invariant, role-verification gate, rolestate package, Codex
+    adapter) passes unchanged — expected, since this phase's diff touches only
+    cli/start_cmd.go (additive, 4 lines), new cli/bootstrap.go/bootstrap_test.go, and
+    harness/VERSION. workflow.go, rolestate.go, tools_cmd.go, adapter_cmd.go, planmeta.go,
+    agent/permissions.go, and every tooladapter/*.go file have zero diff this phase (confirmed
+    via `git status --short`).
+
+new_unit_tests:
+  - TestScanPlansNoPlansDir
+  - TestScanPlansAllTerminal
+  - TestScanPlansMixedTerminalAndUnfinished
+  - TestScanPlansSkipsDirWithoutPlanYAML
+  - TestGatherBootstrapStatusUninitializedProject
+  - TestGatherBootstrapStatusInitializedProject
+  - TestRenderBootstrapPromptDeterministic
+  - TestRenderBootstrapPromptInstructions
+  - TestRenderBootstrapPromptPlanCountsZero
+  - TestRenderBootstrapPromptPlanCountsOne
+  - TestRenderBootstrapPromptPlanCountsMany
+  - TestRenderBootstrapPromptBounded
+  - TestStartCommandIncludesBootstrapPrompt
+  result: 13/13 PASS
+
+quick_fix_e2e_spotcheck:
+  fixture: benchmarks/fixtures/quick-fix (fresh scratch copy)
+  commands_run:
+    - "eng init"
+    - 'eng workflow start "Increase the reconnect timeout from 1000 ms to 1500 ms."'
+  observed: >
+    Identical output to the Phase 10 regression run recorded in
+    benchmarks/results/phase8-9-scenarios-phase10-reverify.yaml — triaged quick-fix,
+    "Active role: none / Next role: executor" — confirming no behavior change in the
+    workflow/rolestate path this phase deliberately did not touch.
+  result: PASS
+
+version_metadata:
+  harness_VERSION_file: "0.10.1-beta"
+  eng_doctor_output: "Harness install:   found at <scratch ENG_HOME> (version 0.10.1-beta)"
+  method: >
+    Built the binary, ran `eng install --from .` into a scratch $ENG_HOME (via a scratch
+    USERPROFILE override — the user's real ~/.engineering-harness was deliberately left
+    untouched mid-session; a real `eng install --from .` after this commit lands is the
+    user's own step to pick this up for real). eng doctor against the scratch install
+    correctly reported 0.10.1-beta.
+  result: PASS
+
+real_claude_bootstrap_verification:
+  method: >
+    Went beyond the plan's minimum requirement: extracted the exact rendered bootstrap prompt
+    eng start would produce for a real scratch project (via a temporary debug test, deleted
+    before commit and never staged — not part of the shipped diff), then fed it to the real,
+    installed, authenticated `claude` binary non-interactively: `claude -p
+    --append-system-prompt "<the real rendered prompt>" "Are you running under a harness right
+    now? If so, name it, and state the project mode, workflow settings, and Codex state. Do
+    not guess."`
+  real_response_verbatim_excerpt: |
+    Yes — I'm running under the Global Engineering Harness (v0.10.1-beta). I tried to
+    independently verify this with `eng doctor` / `eng workflow status`, but those commands
+    were blocked pending approval in this session, so the following is from the harness
+    context provided to me at session start, not something I guessed:
+    - Harness home: .../phase10-1-scratch-home/.engineering-harness
+    - Project root: .../phase10-1-scratch-project
+    - Project mode: modern
+    - Workflow settings: planning=spec_first, triage=on, plan_review=on, verifier=on
+    - Codex: installed=true, wired=true, invokable=true
+    - Plans: no unfinished plans — clean state
+    If you want me to actually confirm this against live state rather than the session-start
+    snapshot, I'd need you to approve running `eng doctor` (and/or `eng workflow status`).
+  analysis: >
+    Confirms the real mechanism end-to-end: the real claude binary correctly recognized the
+    harness, correctly reported every field matching gatherBootstrapStatus's actual output,
+    correctly distinguished "trusted context provided at session start" from "something I
+    verified live," correctly attempted to verify through eng per the prompt's own
+    instruction, and reported honestly (not silently) when that verification was blocked by
+    the non-interactive -p sandbox's approval gate rather than asserting unverified facts. It
+    did not claim the harness was fictional — the exact pre-fix failure mode is gone.
+  result: PASS
+  caveat: >
+    This is a real, non-interactive claude -p invocation with the actual rendered prompt —
+    strong mechanism-level evidence, but distinct from a true interactive `eng start` session
+    launched from a real terminal (this sandboxed tool environment has no TTY, so the
+    interactive TUI itself could not be launched/observed here — attempting a real `eng start`
+    inside this tool's Bash shell failed with "Input must be provided either through stdin or
+    as a prompt argument when using --print", an artifact of the non-interactive shell, not a
+    bootstrap defect: plain `claude --version` and `claude -p` both work fine in this same
+    shell). A genuine interactive dogfood pass in a real terminal is recommended as a final
+    manual check, described below.
+
+manual_dogfood_still_recommended:
+  steps:
+    - "eng install --from . --add-to-path   (real install, overwrites the stale version)"
+    - "cd <a real harness-initialized project>"
+    - "eng doctor   (confirm version 0.10.1-beta)"
+    - "eng start"
+    - "In the fresh interactive session, ask or observe: does it state it's harness-managed?"
+  status: NOT YET RUN — requires a real interactive terminal, which this sandboxed session
+    does not have. The real-claude-bootstrap-verification above exercises the identical
+    mechanism (same binary, same real rendered prompt, same --append-system-prompt flag) and
+    is strong evidence, but the user should still run this once for full end-to-end confidence.
+
+summary:
+  all_automated_checks: PASS
+  regressions_found: 0
+  mechanism_verified_against_real_claude_binary: PASS
+  full_interactive_dogfood: NOT YET RUN (recommended, see above)

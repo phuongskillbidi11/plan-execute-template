@@ -45,7 +45,9 @@ func cmdStart(args []string) {
 
 	if capabilities.Detect("claude") {
 		fmt.Println("\nLaunching Claude Code...")
-		c := exec.Command("claude")
+		status := gatherBootstrapStatus(dir)
+		prompt := renderBootstrapPrompt(status)
+		c := exec.Command("claude", startClaudeArgs(prompt)...)
 		c.Stdin = os.Stdin
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
@@ -59,6 +61,19 @@ func cmdStart(args []string) {
 
 	fmt.Println("\n`claude` was not found on PATH. Configure an agent in .agent/project.yaml,")
 	fmt.Println("or install one and re-run `eng start`.")
+}
+
+// startClaudeArgs returns the argv (excluding the program name) eng start
+// passes to the launched `claude` process. A pure function, deliberately
+// separated from the exec.Command call itself, so the bootstrap wiring is
+// testable without spawning a real process — the same pattern buildChildEnv
+// already established for the child environment. --append-system-prompt
+// adds the harness's trusted runtime identity to Claude's default system
+// prompt without replacing it (see DECISION_LOG.md Decision 1); os/exec
+// never shells out this call on any platform, so prompt is passed as a
+// single argv entry with no quoting/escaping hazard.
+func startClaudeArgs(prompt string) []string {
+	return []string{"--append-system-prompt", prompt}
 }
 
 // engBinDirs returns every directory known to contain a working `eng`

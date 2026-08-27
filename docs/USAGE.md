@@ -119,6 +119,36 @@ session — if `eng` still somehow isn't resolvable inside a nested shell the se
 (e.g. its own shell profile scripts reset `PATH`), fall back to `"$ENG_HOME/bin/eng"`
 (`%ENG_HOME%\bin\eng.exe` on Windows) as an absolute path.
 
+### How a fresh session knows it's harness-managed (Phase 10.1)
+
+Before Phase 10.1, none of the above was actually visible *to the launched agent* — env vars
+require already knowing to inspect them, and `eng start`'s own printed lines land in the shared
+terminal, not the agent's context. A fresh session had no channel to learn the harness existed,
+and (confirmed via real dogfooding) concluded it was a standard, unharnessed Claude Code session.
+
+`eng start` now also launches `claude` with `--append-system-prompt "<bootstrap identity>"` — a
+small, deterministic, machine-generated status block (harness home/version, project mode,
+workflow settings, Codex installed/wired/invokable, and whether any plan is unfinished),
+appended to Claude Code's own default system prompt, not replacing it. This is a **trusted**
+channel distinct from anything said in chat: the harness's own process produced every line from
+`eng doctor`'s own data sources, before the session's first turn. The prompt also tells the
+agent to verify current state through `eng` rather than trust the snapshot alone, that a missing
+project-local `CLAUDE.md`/`.claude/` does not mean the harness is absent (the global install at
+`ENG_HOME` is the source of truth — see the hierarchy below), and not to auto-resume a
+`COMPLETED` plan.
+
+**Global harness vs. project-local files:**
+
+```
+GLOBAL   ~/.engineering-harness          <- source of truth for "is the harness installed"
+PROJECT  .agent/project.yaml             <- source of truth for "is this project harness-enabled"
+SESSION  eng start                       <- source of truth for "does this session know it"
+```
+
+A project's own `CLAUDE.md`/`.claude/settings.json` (legacy or otherwise) may exist alongside
+all of this, but proves nothing about the harness either way — they were never the mechanism,
+and Phase 10.1 doesn't make them one.
+
 Inside that session, **speak naturally** — don't type `eng` commands yourself:
 
 ```text

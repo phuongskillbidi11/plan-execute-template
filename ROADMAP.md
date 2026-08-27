@@ -8,7 +8,10 @@ and added real-world skill coverage (C#/.NET desktop, Qt/CMake, serial/protocol 
 embedded Linux, reverse engineering). Phase 10 turned the Planner/Plan Reviewer/Executor/
 Verifier lifecycle from a documented convention into a runtime-enforced one — role activation
 is now validated and recorded, and the state machine can no longer retroactively legitimize
-work that happened outside it — and added a minimal, read-only Codex delegation adapter. See
+work that happened outside it — and added a minimal, read-only Codex delegation adapter. Phase
+10.1 closed a P1 gap found immediately afterward: a fresh, harness-launched session had no
+channel to learn any of the above — `eng start` now hands it a small, trusted, machine-generated
+identity block at session start. See
 [`README.md`](README.md) for what's implemented today and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 for how it fits together. The detailed design record for each phase lives in its own
 `.plans/YYYY-MM-DD-v2-harness-*/spec.md` and `DECISION_LOG.md` — this file stays a short,
@@ -25,8 +28,12 @@ refinement items (Quick Fix triage misclassification, doc-context over-matching,
 Phase 10 closed a P1 architectural gap found during real dogfooding on an actual investigation
 workflow: the workflow state machine could be advanced after real work had already happened
 outside it — see [`benchmarks/results/investigation-bypass-blocked.yaml`](benchmarks/results/investigation-bypass-blocked.yaml)
-for the real reproduced-and-fixed proof. See [`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md)
-for the full evidence trail on every closed item.
+for the real reproduced-and-fixed proof. Phase 10.1 closed the very next gap real dogfooding
+found: a fresh session launched via `eng start` had no way to learn any of Phase 10's own
+enforcement existed, and correctly (given what it actually had) concluded no harness was
+present — see [`benchmarks/results/phase10-1-bootstrap-verified.yaml`](benchmarks/results/phase10-1-bootstrap-verified.yaml).
+See [`benchmarks/BACKLOG.md`](benchmarks/BACKLOG.md) for the full evidence trail on every closed
+item.
 
 ## Now: continued real-world dogfooding
 

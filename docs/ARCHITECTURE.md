@@ -123,6 +123,29 @@ command and a stop.
 
 See [`docs/USAGE.md`](USAGE.md#workflow-states) for the full state table and transition rules.
 
+## Session bootstrap (Phase 10.1)
+
+Everything below in this document — role enforcement, state-role mapping, the enforced-vs-
+instructional boundary — only matters to a session that already knows to consult it. Real
+dogfooding immediately after Phase 10 shipped found that a fresh, harness-launched Claude Code
+session had no way to learn any of it: `eng start` set `ENG_HOME`/`ENG_PROJECT_ROOT`/
+`ENG_VERSION` as environment variables (Phase 9) and printed a pointer to
+`core/runtime/METHOD.md`, but env vars aren't self-announcing and printed terminal output never
+reaches the launched agent's own context — so the session concluded, correctly given what it
+actually had, that no harness existed.
+
+`eng start` (`cli/bootstrap.go`) now also launches `claude` with `--append-system-prompt
+"<bootstrap identity>"` — a small, deterministic status block built from the same data `eng
+doctor` reads (`gatherBootstrapStatus`), appended to Claude Code's own default system prompt via
+a real, verified CLI flag (not a shell-string hack — `os/exec` never invokes a shell for this
+call on any platform). This is a **trusted** channel, distinct from anything said in chat: every
+line traces back to a specific field the harness's own process read before the session's first
+turn, not free-form text a session or a user could fabricate. It tells the agent to verify
+current state through `eng` rather than trust the snapshot alone, states plainly that a missing
+project-local `CLAUDE.md`/`.claude/` does not mean the harness is absent, and instructs it not
+to auto-resume a `COMPLETED` plan. See [`docs/USAGE.md`](USAGE.md#how-a-fresh-session-knows-its-harness-managed-phase-101)
+for the exact prompt shape and the global-vs-project-vs-session hierarchy.
+
 ## Role runtime enforcement (Phase 10)
 
 Before Phase 10, `Planner → Plan Reviewer → Executor → Verifier` was a documented convention —
@@ -241,7 +264,9 @@ Full detail lives in [`docs/tools.md`](tools.md); summary:
 found and Phase 9 fixed every real-world gap it surfaced; real dogfooding after that found the
 workflow state machine could be advanced after work had already happened outside it (see
 [Role runtime enforcement](#role-runtime-enforcement-phase-10) above) — fixed in Phase 10, with
-a real reproduced-and-blocked proof, not just a design claim. See
+a real reproduced-and-blocked proof, not just a design claim. Dogfooding immediately after that
+found a fresh harness-launched session had no way to *learn* any of the above (see
+[Session bootstrap](#session-bootstrap-phase-101) above) — fixed in Phase 10.1. See
 [`benchmarks/SCORECARD.md`](../benchmarks/SCORECARD.md) and
 [`benchmarks/BACKLOG.md`](../benchmarks/BACKLOG.md) for the full evidence, and the README's
 [Known Limitations](../README.md#known-limitations) for what's still genuinely open.

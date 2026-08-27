@@ -163,3 +163,30 @@ outside what a CLI harness can technically intercept — it prevents the workflo
 retroactively legitimizing one once detected.
 
 **From:** `.plans/2026-08-27-v2-harness-phase10-role-enforcement/`
+
+### A harness-launched session had no way to learn the harness existed
+
+**Trap:** `eng start` (Phase 9 onward) correctly sets `ENG_HOME`/`ENG_PROJECT_ROOT`/`ENG_VERSION`
+as environment variables and prints a pointer to `core/runtime/METHOD.md` before launching
+`claude` — this looks like enough, since the information is technically all there. Related to,
+but distinct from, the earlier PATH-propagation gotcha above: that one is about `eng` being
+*resolvable*; this one is about the launched *agent* ever knowing to look.
+
+**Symptom:** A fresh Claude Code session launched via `eng start` reported "No Global Engineering
+Harness exists here... This is a standard Claude Code session," having checked only
+project-local `.claude/`/`CLAUDE.md`. This was not a hallucination — env vars require already
+knowing to inspect them, and `eng start`'s own printed lines land in the shared terminal, never
+in the launched agent's own context (terminal scrollback is not conversation history). The
+session's conclusion was correct given the actual information available to it; nothing false was
+told, but nothing true was told either.
+
+**Fix / rule:** `eng start` (Phase 10.1 onward) also launches `claude` with
+`--append-system-prompt "<bootstrap identity>"` — a small, deterministic status block
+(`cli/bootstrap.go`'s `gatherBootstrapStatus`/`renderBootstrapPrompt`) built from the same data
+`eng doctor` reads, appended to Claude Code's default system prompt via a real, verified CLI
+flag. A trusted channel, not user chat text — see `docs/ARCHITECTURE.md`'s "Session bootstrap"
+section. Any future launch-time integration must use this same trusted-prompt channel for
+anything a fresh session needs to know unprompted — env vars alone are not a UX mechanism, only
+a plumbing one.
+
+**From:** `.plans/2026-08-27-v2-harness-phase10-1-runtime-bootstrap/`

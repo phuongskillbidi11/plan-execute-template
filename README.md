@@ -114,6 +114,13 @@ retroactively legitimize work that happened outside it. See
 for the design and [`benchmarks/results/investigation-bypass-blocked.yaml`](benchmarks/results/investigation-bypass-blocked.yaml)
 for the real reproduced-and-blocked proof.
 
+Dogfooding immediately after Phase 10 found the next layer of the same problem: a fresh,
+harness-launched Claude Code session had no way to *learn* any of the above — it checked only
+project-local `.claude/`/`CLAUDE.md`, found nothing, and correctly (given what it actually had)
+concluded no harness existed. **Phase 10.1 fixed this** — `eng start` now launches the session
+with a small, trusted, machine-generated identity block appended to its system prompt. See
+[`docs/ARCHITECTURE.md#session-bootstrap-phase-101`](docs/ARCHITECTURE.md#session-bootstrap-phase-101).
+
 See [Known limitations](#known-limitations) for what's still genuinely open, and
 [`benchmarks/README.md`](benchmarks/README.md) for how to reproduce any of this yourself.
 
@@ -345,6 +352,9 @@ non-PLC serial/RS485 projects, and a global/local duplicate-skill resolution bug
 already happened outside it (role activation was a documented convention, not a runtime-checked
 fact) — see [`docs/ARCHITECTURE.md#role-runtime-enforcement-phase-10`](docs/ARCHITECTURE.md#role-runtime-enforcement-phase-10)
 and [`benchmarks/results/investigation-bypass-blocked.yaml`](benchmarks/results/investigation-bypass-blocked.yaml).
+
+**Resolved in Phase 10.1:** a fresh, harness-launched session had no channel to learn the
+harness existed — see [`docs/ARCHITECTURE.md#session-bootstrap-phase-101`](docs/ARCHITECTURE.md#session-bootstrap-phase-101).
 
 Still open:
 
